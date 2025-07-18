@@ -11,9 +11,27 @@ class OpenAIService: ObservableObject {
     private let model = "gpt-4o-mini" // Cost-effective model for nutrition tasks
     
     private init() {
-        // In a real app, store this securely in Keychain or use environment variables
-        // For development, you can set this in your app's build configuration
-        self.apiKey = Bundle.main.object(forInfoDictionaryKey: "OPENAI_API_KEY") as? String ?? "your-openai-api-key-here"
+        // Load configuration from Info.plist (which reads from Config.xcconfig)
+        let configuredKey = Bundle.main.object(forInfoDictionaryKey: "OPENAI_API_KEY") as? String ?? ""
+        
+        // Validate API key configuration
+        if configuredKey.isEmpty || configuredKey == "your-openai-api-key-here" || configuredKey == "$(OPENAI_API_KEY)" {
+            print("""
+            ⚠️ OpenAI API key not configured!
+            
+            To set up OpenAI integration:
+            1. Copy Config.xcconfig.template to Config.xcconfig
+            2. Get your API key from: https://platform.openai.com/api-keys
+            3. Add your key to Config.xcconfig: OPENAI_API_KEY = sk-your-key-here
+            
+            Current value: '\(configuredKey)'
+            
+            AI features will be disabled until configured.
+            """)
+            self.apiKey = ""
+        } else {
+            self.apiKey = configuredKey
+        }
     }
     
     // MARK: - Meal Analysis

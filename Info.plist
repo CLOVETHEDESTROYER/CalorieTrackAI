@@ -55,9 +55,13 @@
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>CalTrack AI uses speech recognition to convert your voice input into food entries.</string>
     
-    <!-- OpenAI API Configuration -->
-    <!-- Replace with your actual OpenAI API key -->
+    <!-- API Configuration - Values loaded from Config.xcconfig -->
+    <!-- To set up: Copy Config.xcconfig.template to Config.xcconfig and add your keys -->
     <key>OPENAI_API_KEY</key>
-    <string>your-openai-api-key-here</string>
+    <string>$(OPENAI_API_KEY)</string>
+    <key>SUPABASE_URL</key>
+    <string>$(SUPABASE_URL)</string>
+    <key>SUPABASE_ANON_KEY</key>
+    <string>$(SUPABASE_ANON_KEY)</string>
 </dict>
 </plist> 

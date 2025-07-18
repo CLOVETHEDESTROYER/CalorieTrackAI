@@ -137,33 +137,43 @@ This app follows the **MVVM (Model-View-ViewModel)** pattern with **Supabase bac
 
 - Xcode 14.0 or later
 - iOS 15.0+ simulator or device
+- OpenAI API account (for AI features)
 - Supabase account (free tier available)
 
-### Setup Instructions
+### 🚀 Quick Setup
 
-1. **Clone and Setup Project**
+**For detailed setup instructions, see [SETUP.md](SETUP.md)**
+
+1. **Clone the Repository**
 
    ```bash
    git clone <repository>
    cd CalTrackAI
    ```
 
-2. **Setup Supabase Backend**
+2. **Configure API Keys (Secure Method)**
 
-   - Follow the detailed guide in `SUPABASE_SETUP.md`
+   ```bash
+   # Copy the configuration template
+   cp Config.xcconfig.template Config.xcconfig
+
+   # Edit Config.xcconfig with your actual API keys
+   # - OpenAI: https://platform.openai.com/api-keys
+   # - Supabase: https://supabase.com/dashboard
+   ```
+
+3. **Setup Database**
+
    - Create Supabase project
-   - Run the SQL schema from `supabase_setup.sql`
-   - Add Supabase Swift package to Xcode
+   - Run SQL schema from `supabase_setup.sql`
+   - Verify tables created
 
-3. **Configure Credentials**
-
-   - Get your Supabase URL and anon key
-   - Update `Services/SupabaseService.swift` with your credentials
-
-4. **Run the App**
+4. **Build and Test**
    - Open project in Xcode
-   - Build and run on iOS 15.0+ device/simulator
-   - Create account or sign in to test
+   - Build and run
+   - Test AI features and data sync
+
+**🔒 Security Note**: API keys are stored securely in `Config.xcconfig` (gitignored) and loaded via Xcode build configuration.
 
 ## Features in Detail
 

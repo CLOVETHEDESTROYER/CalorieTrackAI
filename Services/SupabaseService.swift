@@ -10,12 +10,28 @@ class SupabaseService: ObservableObject {
     @Published var isAuthenticated = false
     
     private init() {
-        // Replace with your actual Supabase URL and anon key
-        let supabaseURL = URL(string: "https://your-project.supabase.co")!
-        let supabaseKey = "your-anon-key-here"
+        // Load configuration from Info.plist (which reads from Config.xcconfig)
+        guard let supabaseURL = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
+              let supabaseKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String,
+              !supabaseURL.isEmpty && !supabaseKey.isEmpty,
+              supabaseURL != "your-supabase-url-here" && supabaseKey != "your-supabase-anon-key-here",
+              let url = URL(string: supabaseURL) else {
+            fatalError("""
+            ⚠️ Supabase configuration missing!
+            
+            Please set up your Supabase credentials:
+            1. Copy Config.xcconfig.template to Config.xcconfig
+            2. Add your Supabase URL and anon key to Config.xcconfig
+            3. Get your credentials from: https://supabase.com/dashboard
+            
+            Current values:
+            - SUPABASE_URL: \(Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String ?? "missing")
+            - SUPABASE_ANON_KEY: \(Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String ?? "missing")
+            """)
+        }
         
         self.client = SupabaseClient(
-            supabaseURL: supabaseURL,
+            supabaseURL: url,
             supabaseKey: supabaseKey
         )
         

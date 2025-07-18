@@ -1,0 +1,22 @@
+// CalTrack AI Configuration Template
+// 
+// SETUP INSTRUCTIONS:
+// 1. Copy this file and rename it to "Config.xcconfig"
+// 2. Replace the placeholder values with your actual API keys
+// 3. The actual Config.xcconfig file is in .gitignore and won't be committed
+//
+// To get your API keys:
+// - OpenAI: https://platform.openai.com/api-keys
+// - Supabase: https://supabase.com/dashboard (Project Settings > API)
+
+// OpenAI Configuration
+OPENAI_API_KEY = your-openai-api-key-here
+
+// Supabase Configuration
+SUPABASE_URL = your-supabase-url-here
+SUPABASE_ANON_KEY = your-supabase-anon-key-here
+
+// Optional: Environment-specific configurations
+// For production, consider creating separate files:
+// - Config-Debug.xcconfig (for development)
+// - Config-Release.xcconfig (for production/TestFlight) 
