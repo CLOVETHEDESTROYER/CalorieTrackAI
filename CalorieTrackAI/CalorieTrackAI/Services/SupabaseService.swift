@@ -100,12 +100,12 @@ class SupabaseService: ObservableObject {
             .rpc("create_user_profile", params: [
                 "p_user_id": profile.user_id.uuidString,
                 "p_name": profile.name,
-                "p_age": profile.age,
-                "p_weight": profile.weight,
-                "p_height": profile.height,
+                "p_age": String(profile.age),
+                "p_weight": String(profile.weight),
+                "p_height": String(profile.height),
                 "p_activity_level": profile.activity_level,
                 "p_goal_type": profile.goal_type,
-                "p_daily_calorie_goal": profile.daily_calorie_goal
+                "p_daily_calorie_goal": String(profile.daily_calorie_goal)
             ])
             .execute()
     }
