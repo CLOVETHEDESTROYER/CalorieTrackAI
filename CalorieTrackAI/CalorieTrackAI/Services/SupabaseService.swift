@@ -58,10 +58,9 @@ class SupabaseService: ObservableObject {
             password: password
         )
         
-        // Create user profile after signup
-        let user = response.user
+        // Create user profile using RPC function to bypass RLS
         let profile = UserProfile(
-            user_id: user.id,
+            user_id: response.user.id,
             name: name,
             age: 25,
             weight: 70.0,
@@ -70,7 +69,8 @@ class SupabaseService: ObservableObject {
             goal_type: "maintain",
             daily_calorie_goal: 2000
         )
-        try await saveUserProfile(profile)
+        
+        try await createInitialUserProfile(profile)
     }
     
     func signIn(email: String, password: String) async throws {
@@ -93,6 +93,24 @@ class SupabaseService: ObservableObject {
             .upsert(profile)
             .execute()
     }
+    
+    // Function to create initial user profile bypassing RLS
+    private func createInitialUserProfile(_ profile: UserProfile) async throws {
+        try await client
+            .rpc("create_user_profile", params: [
+                "p_user_id": profile.user_id.uuidString,
+                "p_name": profile.name,
+                "p_age": profile.age,
+                "p_weight": profile.weight,
+                "p_height": profile.height,
+                "p_activity_level": profile.activity_level,
+                "p_goal_type": profile.goal_type,
+                "p_daily_calorie_goal": profile.daily_calorie_goal
+            ])
+            .execute()
+    }
+    
+
     
     func getUserProfile() async throws -> UserProfile? {
         guard let userId = currentUser?.id else {

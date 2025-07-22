@@ -100,6 +100,44 @@ CREATE POLICY "Authenticated users can read food database" ON food_database
 CREATE POLICY "Authenticated users can add foods" ON food_database
     FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
+-- RPC function to create initial user profile (bypasses RLS)
+CREATE OR REPLACE FUNCTION create_user_profile(
+    p_user_id UUID,
+    p_name TEXT,
+    p_age INTEGER,
+    p_weight DECIMAL,
+    p_height DECIMAL,
+    p_activity_level TEXT DEFAULT 'sedentary',
+    p_goal_type TEXT DEFAULT 'maintain',
+    p_daily_calorie_goal DECIMAL DEFAULT 2000
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    INSERT INTO user_profiles (
+        user_id,
+        name,
+        age,
+        weight,
+        height,
+        activity_level,
+        goal_type,
+        daily_calorie_goal
+    ) VALUES (
+        p_user_id,
+        p_name,
+        p_age,
+        p_weight,
+        p_height,
+        p_activity_level,
+        p_goal_type,
+        p_daily_calorie_goal
+    );
+END;
+$$;
+
 -- Functions and triggers
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
