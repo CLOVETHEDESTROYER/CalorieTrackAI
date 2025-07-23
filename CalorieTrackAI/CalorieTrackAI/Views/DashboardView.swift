@@ -49,6 +49,49 @@ struct DashboardView: View {
                             .stroke(Color.blue.opacity(0.3), lineWidth: 1)
                     )
                     
+                    // User Stats Card
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Your Stats")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        if viewModel.isLoading {
+                            ProgressView("Loading...")
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Current Weight")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text(viewModel.currentWeightDisplay)
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.green)
+                                }
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    Text("Lean Body Mass")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text(viewModel.leanBodyMassDisplay)
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                    )
+                    
                     // Daily Progress Card
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Today's Progress")
@@ -88,7 +131,10 @@ struct DashboardView: View {
                         MacrosView(
                             protein: viewModel.protein,
                             carbs: viewModel.carbs,
-                            fat: viewModel.fat
+                            fat: viewModel.fat,
+                            proteinGoal: viewModel.proteinGoal,
+                            carbsGoal: viewModel.carbsGoal,
+                            fatGoal: viewModel.fatGoal
                         )
                     }
                     

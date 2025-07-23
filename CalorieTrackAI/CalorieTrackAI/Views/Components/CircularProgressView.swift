@@ -6,27 +6,43 @@ struct CircularProgressView: View {
     
     private var safeProgress: Double {
         guard !progress.isNaN && !progress.isInfinite else { return 0 }
-        return min(max(progress, 0), 1.0)  // Clamp between 0 and 1
+        return max(progress, 0)  // Only clamp minimum, allow over 100%
+    }
+    
+    private var displayProgress: Double {
+        return min(safeProgress, 1.0)  // For visual circle, cap at 100%
+    }
+    
+    private var progressColor: Color {
+        return safeProgress > 1.0 ? .red : color
+    }
+    
+    private var progressText: String {
+        if safeProgress > 1.0 {
+            return "+\(Int((safeProgress - 1.0) * 100))%"
+        } else {
+            return "\(Int(safeProgress * 100))%"
+        }
     }
     
     var body: some View {
         ZStack {
             Circle()
-                .stroke(color.opacity(0.2), lineWidth: 6)
+                .stroke(progressColor.opacity(0.2), lineWidth: 6)
             
             Circle()
-                .trim(from: 0, to: safeProgress)
+                .trim(from: 0, to: displayProgress)
                 .stroke(
-                    color,
+                    progressColor,
                     style: StrokeStyle(lineWidth: 6, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
-                .animation(.easeInOut(duration: 0.5), value: safeProgress)
+                .animation(.easeInOut(duration: 0.5), value: displayProgress)
             
-            Text("\(Int(safeProgress * 100))%")
+            Text(progressText)
                 .font(.caption)
                 .fontWeight(.bold)
-                .foregroundColor(color)
+                .foregroundColor(progressColor)
         }
     }
 }
@@ -35,6 +51,9 @@ struct MacrosView: View {
     let protein: Double
     let carbs: Double
     let fat: Double
+    let proteinGoal: Double
+    let carbsGoal: Double
+    let fatGoal: Double
     
     // Safe values to prevent NaN
     private var safeProtein: Double {
@@ -59,7 +78,7 @@ struct MacrosView: View {
                 MacroProgressView(
                     label: "Protein",
                     value: safeProtein,
-                    goal: 150, // This should come from user profile
+                    goal: proteinGoal,
                     color: .red,
                     unit: "g"
                 )
@@ -67,7 +86,7 @@ struct MacrosView: View {
                 MacroProgressView(
                     label: "Carbs",
                     value: safeCarbs,
-                    goal: 200,
+                    goal: carbsGoal,
                     color: .orange,
                     unit: "g"
                 )
@@ -75,14 +94,14 @@ struct MacrosView: View {
                 MacroProgressView(
                     label: "Fat",
                     value: safeFat,
-                    goal: 65,
+                    goal: fatGoal,
                     color: .yellow,
                     unit: "g"
                 )
             }
         }
         .padding()
-                    .background(Color.gray.opacity(0.1))
+        .background(Color.gray.opacity(0.1))
         .cornerRadius(12)
     }
 }
