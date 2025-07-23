@@ -195,42 +195,36 @@ class UserService: ObservableObject {
     // MARK: - Calorie Calculation
     
     func calculateDailyCalorieGoal(for user: User) -> Double {
-        // Harris-Benedict Equation for BMR
+        // Convert weight/height to metric if needed
+        let weightKg: Double = user.weightUnit == .kg ? user.weight : user.weight * 0.453592
+        let heightCm: Double = user.heightUnit == .cm ? user.height : user.height * 2.54
+        let age = user.age
+        let bodyFat = user.bodyFatPercent
+        let weeklyChange = user.weeklyWeightChange // lbs/week
+        // Katch-McArdle if body fat % is provided
         let bmr: Double
-        
-        // Note: This is a simplified calculation for males
-        // In a real app, you'd want to consider gender and more sophisticated calculations
-        if user.weight > 0 && user.height > 0 {
-            // BMR calculation (simplified for males)
-            bmr = 88.362 + (13.397 * user.weight) + (4.799 * user.height) - (5.677 * Double(user.age))
+        if let bodyFat = bodyFat, bodyFat > 0, bodyFat < 70 {
+            let leanMass = weightKg * (1 - bodyFat / 100)
+            bmr = 370 + (21.6 * leanMass)
+        } else if weightKg > 0 && heightCm > 0 {
+            // Harris-Benedict (Mifflin-St Jeor for males)
+            bmr = 88.362 + (13.397 * weightKg) + (4.799 * heightCm) - (5.677 * Double(age))
         } else {
-            bmr = 1800 // Default BMR
+            bmr = 1800 // fallback
         }
-        
         // Activity multiplier
         let activityMultiplier: Double
         switch user.activityLevel {
-        case .sedentary:
-            activityMultiplier = 1.2
-        case .lightlyActive:
-            activityMultiplier = 1.375
-        case .moderatelyActive:
-            activityMultiplier = 1.55
-        case .veryActive:
-            activityMultiplier = 1.725
+        case .sedentary: activityMultiplier = 1.2
+        case .lightlyActive: activityMultiplier = 1.375
+        case .moderatelyActive: activityMultiplier = 1.55
+        case .veryActive: activityMultiplier = 1.725
         }
-        
-        let tdee = bmr * activityMultiplier
-        
-        // Goal adjustment
-        switch user.goalType {
-        case .loseWeight:
-            return tdee - 500 // 500 calorie deficit
-        case .maintainWeight:
-            return tdee
-        case .gainWeight:
-            return tdee + 500 // 500 calorie surplus
-        }
+        var tdee = bmr * activityMultiplier
+        // Adjust for goal
+        let calorieDelta = weeklyChange * 500 // 1 lb/week = 500 kcal/day
+        tdee += calorieDelta
+        return max(1200, tdee.rounded())
     }
     
     // MARK: - Utility Functions

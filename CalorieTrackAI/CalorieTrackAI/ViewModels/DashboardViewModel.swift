@@ -60,7 +60,11 @@ class DashboardViewModel: ObservableObject {
             print("Failed to load today's data from server, using offline data: \(error)")
         }
         
-        // Load user's daily goal
+        // Always load the latest user's daily goal
+        await loadUserDailyGoal()
+    }
+    
+    func loadUserDailyGoal() async {
         do {
             if let user = try await userService.getCurrentUser() {
                 dailyGoal = user.dailyCalorieGoal

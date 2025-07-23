@@ -40,11 +40,64 @@ struct ProfileView: View {
                     .padding(.vertical, 8)
                 }
                 
+                // Daily Calorie Goal Section
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Daily Calorie Goal")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            Spacer()
+                        }
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(Int(viewModel.user.dailyCalorieGoal))")
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.blue)
+                                Text("calories per day")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text(viewModel.user.goalType.rawValue.capitalized)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.primary)
+                                Text("Goal")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        if viewModel.user.goalType != .maintainWeight {
+                            HStack {
+                                Text("Weekly Target:")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("\(abs(viewModel.user.weeklyWeightChange), specifier: "%.1f") lbs \(viewModel.user.goalType == .loseWeight ? "loss" : "gain")")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(12)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
+                
                 // Stats Section
                 Section("Your Stats") {
                     StatsRowView(title: "Age", value: "\(viewModel.user.age) years")
-                    StatsRowView(title: "Weight", value: "\(Int(viewModel.user.weight)) kg")
-                    StatsRowView(title: "Height", value: "\(Int(viewModel.user.height)) cm")
+                    StatsRowView(title: "Weight", value: "\(formattedWeight(viewModel.user.weight, unit: viewModel.user.weightUnit))")
+                    StatsRowView(title: "Height", value: "\(formattedHeight(viewModel.user.height, unit: viewModel.user.heightUnit))")
                     StatsRowView(title: "Activity Level", value: viewModel.user.activityLevel.rawValue)
                     StatsRowView(title: "Goal", value: viewModel.user.goalType.rawValue)
                 }
@@ -96,11 +149,31 @@ struct ProfileView: View {
                         viewModel.showingResetAlert = true
                     }
                     .foregroundColor(.red)
+                    Button("Log Out", role: .destructive) {
+                        Task {
+                            do {
+                                try await SupabaseService.shared.signOut()
+                                // Optionally reset any local user state here
+                            } catch {
+                                print("Logout failed: \(error)")
+                            }
+                        }
+                    }
+                    .foregroundColor(.red)
                 }
             }
             .navigationTitle("Profile")
-            .sheet(isPresented: $showingEditProfile) {
+            .sheet(isPresented: $showingEditProfile, onDismiss: {
+                // Save the updated user data when the sheet is dismissed
+                viewModel.saveProfileSync()
+            }) {
                 EditProfileView(user: $viewModel.user)
+            }
+            .onAppear {
+                // Refresh user data when view appears
+                Task {
+                    await viewModel.loadUserFromServer()
+                }
             }
             .alert("Reset Data", isPresented: $viewModel.showingResetAlert) {
                 Button("Cancel", role: .cancel) { }
@@ -143,5 +216,19 @@ struct StatsRowView: View {
             Text(value)
                 .foregroundColor(.secondary)
         }
+    }
+}
+
+private func formattedWeight(_ weight: Double, unit: User.WeightUnit) -> String {
+    switch unit {
+    case .kg: return "\(Int(weight)) kg"
+    case .lb: return "\(Int(weight)) lb"
+    }
+}
+
+private func formattedHeight(_ height: Double, unit: User.HeightUnit) -> String {
+    switch unit {
+    case .cm: return "\(Int(height)) cm"
+    case .inch: return "\(Int(height)) in"
     }
 } 

@@ -8,6 +8,8 @@ class SupabaseService: ObservableObject {
     let client: SupabaseClient
     @Published var currentUser: Supabase.User?
     @Published var isAuthenticated = false
+    @Published var isGuestMode = true
+    private var pendingProfile: UserProfile? = nil
     
     private init() {
         // Load configuration from Info.plist (which reads from Config.xcconfig)
@@ -38,6 +40,7 @@ class SupabaseService: ObservableObject {
         // Check if user is already authenticated
         self.currentUser = client.auth.currentUser
         self.isAuthenticated = currentUser != nil
+        self.isGuestMode = !self.isAuthenticated
         
         // Listen for auth state changes
         Task {
@@ -45,6 +48,14 @@ class SupabaseService: ObservableObject {
                 await MainActor.run {
                     self.currentUser = state.session?.user
                     self.isAuthenticated = state.session != nil
+                    self.isGuestMode = !self.isAuthenticated
+                    // If just authenticated and pendingProfile exists, create it with retry
+                    if self.isAuthenticated, let profile = self.pendingProfile {
+                        Task {
+                            await self.retryCreateUserProfile(profile)
+                            self.pendingProfile = nil
+                        }
+                    }
                 }
             }
         }
@@ -66,7 +77,7 @@ class SupabaseService: ObservableObject {
             weight: 70.0,
             height: 170.0,
             activity_level: "sedentary",
-            goal_type: "maintain",
+            goal_type: "maintain weight",
             daily_calorie_goal: 2000
         )
         
@@ -110,6 +121,28 @@ class SupabaseService: ObservableObject {
             .execute()
     }
     
+    private func retryCreateUserProfile(_ profile: UserProfile, maxAttempts: Int = 3, delaySeconds: UInt64 = 1) async {
+        for attempt in 1...maxAttempts {
+            do {
+                try await createInitialUserProfile(profile)
+                print("✅ User profile created successfully (attempt \(attempt))")
+                return
+            } catch {
+                let errorString = String(describing: error)
+                print("❌ Attempt \(attempt) to create user profile failed: \(error)")
+                // Check for foreign key error code (23503) or message
+                if errorString.contains("violates foreign key constraint") || errorString.contains("23503") {
+                    if attempt < maxAttempts {
+                        try? await Task.sleep(nanoseconds: delaySeconds * 1_000_000_000)
+                        continue
+                    }
+                }
+                // For other errors or after max attempts, break and log
+                print("❌ Failed to create user profile after \(attempt) attempts: \(error)")
+                break
+            }
+        }
+    }
 
     
     func getUserProfile() async throws -> UserProfile? {

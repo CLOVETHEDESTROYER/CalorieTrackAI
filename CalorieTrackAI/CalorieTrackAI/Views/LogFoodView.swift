@@ -3,11 +3,14 @@ import SwiftUI
 struct LogFoodView: View {
     @StateObject private var viewModel = LogFoodViewModel()
     @StateObject private var openAIService = OpenAIService.shared
+    @EnvironmentObject private var supabaseService: SupabaseService
+    @Environment(\.showAuth) private var showAuth
     @State private var showingScanner = false
     @State private var quickAnalysisText = ""
     @State private var quickAnalysisResult: MealAnalysis?
     @State private var showingAIError = false
     @State private var aiErrorMessage = ""
+    @State private var showLoginPrompt = false
     
     // MARK: - View Components
     private var quickActionsSection: some View {
@@ -23,7 +26,11 @@ struct LogFoodView: View {
                     icon: "barcode.viewfinder",
                     color: .blue
                 ) {
-                    showingScanner = true
+                    if supabaseService.isGuestMode {
+                        showLoginPrompt = true
+                    } else {
+                        showingScanner = true
+                    }
                 }
                 
                 QuickActionButton(
@@ -31,7 +38,11 @@ struct LogFoodView: View {
                     icon: "mic.fill",
                     color: .green
                 ) {
-                    viewModel.startVoiceInput()
+                    if supabaseService.isGuestMode {
+                        showLoginPrompt = true
+                    } else {
+                        viewModel.startVoiceInput()
+                    }
                 }
                 
                 QuickActionButton(
@@ -39,7 +50,11 @@ struct LogFoodView: View {
                     icon: "camera.fill",
                     color: .orange
                 ) {
-                    viewModel.openCamera()
+                    if supabaseService.isGuestMode {
+                        showLoginPrompt = true
+                    } else {
+                        viewModel.openCamera()
+                    }
                 }
             }
         }
@@ -66,9 +81,16 @@ struct LogFoodView: View {
                     TextField("Describe your meal (e.g., 'grilled chicken with rice and vegetables')", text: $quickAnalysisText, axis: .vertical)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .lineLimit(2...4)
+                        .disabled(supabaseService.isGuestMode)
                     
                     HStack(spacing: 12) {
-                        Button(action: analyzeQuickMeal) {
+                        Button(action: {
+                            if supabaseService.isGuestMode {
+                                showLoginPrompt = true
+                            } else {
+                                analyzeQuickMeal()
+                            }
+                        }) {
                             HStack {
                                 if openAIService.isLoading {
                                     ProgressView()
@@ -85,7 +107,7 @@ struct LogFoodView: View {
                             .foregroundColor(.white)
                             .cornerRadius(8)
                         }
-                        .disabled(quickAnalysisText.isEmpty || openAIService.isLoading)
+                        .disabled(quickAnalysisText.isEmpty || openAIService.isLoading || supabaseService.isGuestMode)
                         
                         if quickAnalysisResult != nil {
                             Button("Clear") {
@@ -114,6 +136,7 @@ struct LogFoodView: View {
                     
                     TextField("Food name", text: $viewModel.foodName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .disabled(supabaseService.isGuestMode)
                     
                     HStack {
                         TextField("Calories", value: $viewModel.calories, format: .number)
@@ -121,14 +144,20 @@ struct LogFoodView: View {
                             #if os(iOS)
 .keyboardType(.decimalPad)
 #endif
+                            .disabled(supabaseService.isGuestMode)
                         
                         TextField("Serving size", text: $viewModel.servingSize)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .disabled(supabaseService.isGuestMode)
                     }
                     
                     Button(action: {
-                        Task {
-                            await viewModel.addFood()
+                        if supabaseService.isGuestMode {
+                            showLoginPrompt = true
+                        } else {
+                            Task {
+                                await viewModel.addFood()
+                            }
                         }
                     }) {
                         HStack {
@@ -142,11 +171,11 @@ struct LogFoodView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(viewModel.isValidEntry && !viewModel.isLoading ? Color.blue : Color.gray)
+                        .background(viewModel.isValidEntry && !viewModel.isLoading && !supabaseService.isGuestMode ? Color.blue : Color.gray)
                         .foregroundColor(.white)
                         .cornerRadius(10)
                     }
-                    .disabled(!viewModel.isValidEntry || viewModel.isLoading)
+                    .disabled(!viewModel.isValidEntry || viewModel.isLoading || supabaseService.isGuestMode)
                 }
                 .padding()
                 .background(Color.gray.opacity(0.1))
@@ -170,6 +199,14 @@ struct LogFoodView: View {
                 Button("OK") { }
             } message: {
                 Text(aiErrorMessage)
+            }
+            .alert("Login Required", isPresented: $showLoginPrompt) {
+                Button("Log In / Sign Up") {
+                    showAuth.wrappedValue = true
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Please log in or sign up to use this feature.")
             }
         }
     }

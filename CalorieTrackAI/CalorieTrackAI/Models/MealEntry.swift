@@ -134,6 +134,11 @@ struct UserProfile: Codable {
     var activity_level: String
     var goal_type: String
     var daily_calorie_goal: Double
+    var weight_unit: String  // Add this
+    var height_unit: String  // Add this
+    var body_fat_percent: Double?  // Add this
+    var weekly_weight_change: Double  // Add this
+    var gender: String  // Add this
     let created_at: Date?
     let updated_at: Date?
     
@@ -144,8 +149,13 @@ struct UserProfile: Codable {
         weight: Double,
         height: Double,
         activity_level: String = "sedentary",
-        goal_type: String = "maintain",
-        daily_calorie_goal: Double = 2000
+        goal_type: String = "maintain weight",
+        daily_calorie_goal: Double = 2000,
+        weight_unit: String = "kg",  // Add this
+        height_unit: String = "cm",  // Add this
+        body_fat_percent: Double? = nil,  // Add this
+        weekly_weight_change: Double = 0,  // Add this
+        gender: String = "Male"  // Add this
     ) {
         self.user_id = user_id
         self.name = name
@@ -155,12 +165,23 @@ struct UserProfile: Codable {
         self.activity_level = activity_level
         self.goal_type = goal_type
         self.daily_calorie_goal = daily_calorie_goal
+        self.weight_unit = weight_unit
+        self.height_unit = height_unit
+        self.body_fat_percent = body_fat_percent
+        self.weekly_weight_change = weekly_weight_change
+        self.gender = gender
         self.created_at = Date()
         self.updated_at = Date()
     }
     
     // Convert from legacy User model
     static func from(user: User, userId: UUID) -> UserProfile {
+        let goalTypeString: String
+        switch user.goalType {
+        case .loseWeight: goalTypeString = "lose weight"
+        case .maintainWeight: goalTypeString = "maintain weight"
+        case .gainWeight: goalTypeString = "gain weight"
+        }
         return UserProfile(
             user_id: userId,
             name: user.name,
@@ -168,8 +189,13 @@ struct UserProfile: Codable {
             weight: user.weight,
             height: user.height,
             activity_level: user.activityLevel.rawValue.lowercased(),
-            goal_type: user.goalType.rawValue.lowercased(),
-            daily_calorie_goal: user.dailyCalorieGoal
+            goal_type: goalTypeString,
+            daily_calorie_goal: user.dailyCalorieGoal,
+            weight_unit: user.weightUnit.rawValue,  // Add this
+            height_unit: user.heightUnit.rawValue,  // Add this
+            body_fat_percent: user.bodyFatPercent,  // Add this
+            weekly_weight_change: user.weeklyWeightChange,  // Add this
+            gender: user.gender.rawValue  // Add this
         )
     }
     
@@ -183,13 +209,23 @@ struct UserProfile: Codable {
             $0.rawValue.lowercased() == goal_type 
         } ?? .maintainWeight
         
+        let weightUnit = User.WeightUnit(rawValue: weight_unit) ?? .kg
+        let heightUnit = User.HeightUnit(rawValue: height_unit) ?? .cm
+        let gender = User.Gender(rawValue: gender) ?? .male
+        
         return User(
             name: name,
             age: age,
             weight: weight,
             height: height,
             activityLevel: activityLevel,
-            goalType: goalType
+            goalType: goalType,
+            dailyCalorieGoal: daily_calorie_goal,
+            weightUnit: weightUnit,  // Use saved value
+            heightUnit: heightUnit,  // Use saved value
+            bodyFatPercent: body_fat_percent,  // Use saved value
+            weeklyWeightChange: weekly_weight_change,  // Use saved value
+            gender: gender  // Use saved value
         )
     }
 }

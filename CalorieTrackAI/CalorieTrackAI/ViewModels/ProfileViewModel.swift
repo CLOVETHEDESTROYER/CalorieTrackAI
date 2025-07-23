@@ -43,7 +43,8 @@ class ProfileViewModel: ObservableObject {
     func saveProfile() async {
         isLoading = true
         defer { isLoading = false }
-        
+        // Always recalculate before saving
+        user.dailyCalorieGoal = UserService.shared.calculateDailyCalorieGoal(for: user)
         do {
             try await userService.saveUser(user)
         } catch {
@@ -92,7 +93,7 @@ class ProfileViewModel: ObservableObject {
         }
     }
     
-    private func loadUserFromServer() async {
+    func loadUserFromServer() async {
         do {
             if let serverUser = try await userService.getCurrentUser() {
                 user = serverUser

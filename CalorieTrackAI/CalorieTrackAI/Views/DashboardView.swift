@@ -7,6 +7,48 @@ struct DashboardView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
+                    // Daily Calorie Goal Card
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Daily Calorie Goal")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        if viewModel.isLoading {
+                            ProgressView("Loading...")
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text("Target")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("\(Int(viewModel.dailyGoal))")
+                                        .font(.title)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.blue)
+                                }
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .trailing) {
+                                    Text("calories")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text("per day")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                    )
+                    
                     // Daily Progress Card
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Today's Progress")
@@ -81,6 +123,12 @@ struct DashboardView: View {
             }
             .task {
                 await viewModel.loadTodaysData()
+            }
+            .onAppear {
+                // Refresh user's daily goal when view appears
+                Task {
+                    await viewModel.loadUserDailyGoal()
+                }
             }
         }
     }
