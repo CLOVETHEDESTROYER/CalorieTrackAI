@@ -11,6 +11,11 @@ struct LogFoodView: View {
     @State private var showingAIError = false
     @State private var aiErrorMessage = ""
     @State private var showLoginPrompt = false
+    // Focus states for keyboard management
+    @FocusState private var quickAnalysisFieldFocused: Bool
+    @FocusState private var foodNameFieldFocused: Bool
+    @FocusState private var caloriesFieldFocused: Bool
+    @FocusState private var servingSizeFieldFocused: Bool
     
     // MARK: - View Components
     private var quickActionsSection: some View {
@@ -65,126 +70,142 @@ struct LogFoodView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                quickActionsSection
-                
-                // AI Quick Analysis
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        Image(systemName: "brain.head.profile")
-                            .foregroundColor(.purple)
-                        Text("AI Quick Analysis")
-                            .font(.headline)
-                            .fontWeight(.semibold)
+            ZStack {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        clearAllFocus()
                     }
-                    
-                    TextField("Describe your meal (e.g., 'grilled chicken with rice and vegetables')", text: $quickAnalysisText, axis: .vertical)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .lineLimit(2...4)
-                        .disabled(supabaseService.isGuestMode)
-                    
-                    HStack(spacing: 12) {
-                        Button(action: {
-                            if supabaseService.isGuestMode {
-                                showLoginPrompt = true
-                            } else {
-                                analyzeQuickMeal()
-                            }
-                        }) {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        quickActionsSection
+                        
+                        // AI Quick Analysis
+                        VStack(alignment: .leading, spacing: 16) {
                             HStack {
-                                if openAIService.isLoading {
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                } else {
-                                    Image(systemName: "sparkles")
+                                Image(systemName: "brain.head.profile")
+                                    .foregroundColor(.purple)
+                                Text("AI Quick Analysis")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                            }
+                            TextField("Describe your meal (e.g., 'grilled chicken with rice and vegetables')", text: $quickAnalysisText, axis: .vertical)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .lineLimit(2...4)
+                                .disabled(supabaseService.isGuestMode)
+                                .focused($quickAnalysisFieldFocused)
+                            HStack(spacing: 12) {
+                                Button(action: {
+                                    if supabaseService.isGuestMode {
+                                        showLoginPrompt = true
+                                    } else {
+                                        analyzeQuickMeal()
+                                    }
+                                }) {
+                                    HStack {
+                                        if openAIService.isLoading {
+                                            ProgressView()
+                                                .scaleEffect(0.7)
+                                        } else {
+                                            Image(systemName: "sparkles")
+                                        }
+                                        Text(openAIService.isLoading ? "Analyzing..." : "Analyze")
+                                    }
+                                    .font(.caption)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(quickAnalysisText.isEmpty ? Color.gray : Color.purple)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(8)
                                 }
-                                Text(openAIService.isLoading ? "Analyzing..." : "Analyze")
+                                .disabled(quickAnalysisText.isEmpty || openAIService.isLoading || supabaseService.isGuestMode)
+                                if quickAnalysisResult != nil {
+                                    Button("Clear") {
+                                        quickAnalysisText = ""
+                                        quickAnalysisResult = nil
+                                    }
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                }
                             }
-                            .font(.caption)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(quickAnalysisText.isEmpty ? Color.gray : Color.purple)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
-                        }
-                        .disabled(quickAnalysisText.isEmpty || openAIService.isLoading || supabaseService.isGuestMode)
-                        
-                        if quickAnalysisResult != nil {
-                            Button("Clear") {
-                                quickAnalysisText = ""
-                                quickAnalysisResult = nil
-                            }
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    // Quick analysis results
-                    if let result = quickAnalysisResult {
-                        quickAnalysisResultView(result)
-                    }
-                }
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(12)
-                
-                // Manual Entry
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Manual Entry")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                    
-                    TextField("Food name", text: $viewModel.foodName)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .disabled(supabaseService.isGuestMode)
-                    
-                    HStack {
-                        TextField("Calories", value: $viewModel.calories, format: .number)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            #if os(iOS)
-.keyboardType(.decimalPad)
-#endif
-                            .disabled(supabaseService.isGuestMode)
-                        
-                        TextField("Serving size", text: $viewModel.servingSize)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .disabled(supabaseService.isGuestMode)
-                    }
-                    
-                    Button(action: {
-                        if supabaseService.isGuestMode {
-                            showLoginPrompt = true
-                        } else {
-                            Task {
-                                await viewModel.addFood()
+                            if let result = quickAnalysisResult {
+                                quickAnalysisResultView(result)
                             }
                         }
-                    }) {
-                        HStack {
-                            if viewModel.isLoading {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                                Text("Adding...")
-                            } else {
-                                Text("Add Food")
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
                         .padding()
-                        .background(viewModel.isValidEntry && !viewModel.isLoading && !supabaseService.isGuestMode ? Color.blue : Color.gray)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(12)
+                        
+                        // Manual Entry
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Manual Entry")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            
+                            TextField("Food name", text: $viewModel.foodName)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .disabled(supabaseService.isGuestMode)
+                                .focused($foodNameFieldFocused)
+                            
+                            HStack {
+                                TextField("Calories", value: $viewModel.calories, format: .number)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    #if os(iOS)
+                                    .keyboardType(.decimalPad)
+                                    #endif
+                                    .disabled(supabaseService.isGuestMode)
+                                    .focused($caloriesFieldFocused)
+                                
+                                TextField("Serving size", text: $viewModel.servingSize)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .disabled(supabaseService.isGuestMode)
+                                    .focused($servingSizeFieldFocused)
+                            }
+                            
+                            Button(action: {
+                                if supabaseService.isGuestMode {
+                                    showLoginPrompt = true
+                                } else {
+                                    Task {
+                                        await viewModel.addFood()
+                                    }
+                                }
+                            }) {
+                                HStack {
+                                    if viewModel.isLoading {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                        Text("Adding...")
+                                    } else {
+                                        Text("Add Food")
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(viewModel.isValidEntry && !viewModel.isLoading && !supabaseService.isGuestMode ? Color.blue : Color.gray)
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                            }
+                            .disabled(!viewModel.isValidEntry || viewModel.isLoading || supabaseService.isGuestMode)
+                        }
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(12)
+                        Spacer(minLength: 0)
                     }
-                    .disabled(!viewModel.isValidEntry || viewModel.isLoading || supabaseService.isGuestMode)
+                    .padding()
+                    .padding(.top, 8)
                 }
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(12)
-                
-                Spacer()
             }
-            .padding()
             .navigationTitle("Log Food")
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        clearAllFocus()
+                    }
+                }
+            }
             .sheet(isPresented: $showingScanner) {
                 BarcodeScannerView { barcode in
                     viewModel.lookupFoodByBarcode(barcode)
@@ -320,6 +341,13 @@ struct LogFoodView: View {
         default:
             return .red
         }
+    }
+    
+    private func clearAllFocus() {
+        quickAnalysisFieldFocused = false
+        foodNameFieldFocused = false
+        caloriesFieldFocused = false
+        servingSizeFieldFocused = false
     }
 }
 
