@@ -35,7 +35,9 @@ class UserService: ObservableObject {
                     saveUserOffline(legacyUser)
                 }
             } catch {
+                #if DEBUG
                 print("Failed to load user profile: \(error)")
+                #endif
                 // Try to load from offline storage
                 currentUserProfile = getCurrentUserOffline()?.toUserProfile()
             }

@@ -16,6 +16,7 @@ class OpenAIService: ObservableObject {
         
         // Validate API key configuration
         if configuredKey.isEmpty || configuredKey == "your-openai-api-key-here" || configuredKey == "$(OPENAI_API_KEY)" {
+            #if DEBUG
             print("""
             ⚠️ OpenAI API key not configured!
             
@@ -28,6 +29,7 @@ class OpenAIService: ObservableObject {
             
             AI features will be disabled until configured.
             """)
+            #endif
             self.apiKey = ""
         } else {
             self.apiKey = configuredKey

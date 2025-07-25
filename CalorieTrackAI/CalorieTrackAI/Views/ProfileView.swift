@@ -155,7 +155,9 @@ struct ProfileView: View {
                                 try await SupabaseService.shared.signOut()
                                 // Optionally reset any local user state here
                             } catch {
+                                #if DEBUG
                                 print("Logout failed: \(error)")
+                                #endif
                             }
                         }
                     }
@@ -170,9 +172,10 @@ struct ProfileView: View {
                 EditProfileView(user: $viewModel.user)
             }
             .onAppear {
-                // Refresh user data when view appears
+                // Refresh user data and progress when view appears
                 Task {
                     await viewModel.loadUserFromServer()
+                    await viewModel.refreshProgress()
                 }
             }
             .alert("Reset Data", isPresented: $viewModel.showingResetAlert) {

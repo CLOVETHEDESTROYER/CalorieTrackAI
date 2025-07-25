@@ -20,9 +20,13 @@ class VoiceService: ObservableObject {
                 case .authorized:
                     self.startRecording(completion: completion)
                 case .denied, .restricted, .notDetermined:
+                    #if DEBUG
                     print("Speech recognition not authorized")
+                    #endif
                 @unknown default:
+                    #if DEBUG
                     print("Unknown speech recognition authorization status")
+                    #endif
                 }
             }
         }
@@ -40,7 +44,9 @@ class VoiceService: ObservableObject {
             try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
+            #if DEBUG
             print("Audio session setup failed: \(error)")
+            #endif
             return
         }
         #endif
@@ -48,7 +54,9 @@ class VoiceService: ObservableObject {
         // Create recognition request
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest = recognitionRequest else {
+            #if DEBUG
             print("Unable to create recognition request")
+            #endif
             return
         }
         
@@ -65,7 +73,9 @@ class VoiceService: ObservableObject {
             }
             
             if let error = error {
+                #if DEBUG
                 print("Speech recognition error: \(error)")
+                #endif
                 self.stopRecording()
             }
         }
@@ -83,7 +93,9 @@ class VoiceService: ObservableObject {
         do {
             try audioEngine.start()
         } catch {
+            #if DEBUG
             print("Audio engine failed to start: \(error)")
+            #endif
         }
         
         // Auto-stop after 10 seconds
@@ -107,7 +119,9 @@ class VoiceService: ObservableObject {
         do {
             try AVAudioSession.sharedInstance().setActive(false)
         } catch {
+            #if DEBUG
             print("Failed to deactivate audio session: \(error)")
+            #endif
         }
         #endif
     }

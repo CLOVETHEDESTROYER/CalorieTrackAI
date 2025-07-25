@@ -18,6 +18,7 @@ class SupabaseService: ObservableObject {
               !supabaseURL.isEmpty && !supabaseKey.isEmpty,
               supabaseURL != "your-supabase-url-here" && supabaseKey != "your-supabase-anon-key-here",
               let url = URL(string: supabaseURL) else {
+            #if DEBUG
             fatalError("""
             ⚠️ Supabase configuration missing!
             
@@ -30,6 +31,17 @@ class SupabaseService: ObservableObject {
             - SUPABASE_URL: \(Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String ?? "missing")
             - SUPABASE_ANON_KEY: \(Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String ?? "missing")
             """)
+            #else
+            // In production, create a basic client that will fail gracefully
+            self.client = SupabaseClient(
+                supabaseURL: URL(string: "https://placeholder.supabase.co")!,
+                supabaseKey: "placeholder"
+            )
+            self.currentUser = nil
+            self.isAuthenticated = false
+            self.isGuestMode = true
+            return
+            #endif
         }
         
         self.client = SupabaseClient(
@@ -125,11 +137,15 @@ class SupabaseService: ObservableObject {
         for attempt in 1...maxAttempts {
             do {
                 try await createInitialUserProfile(profile)
+                #if DEBUG
                 print("✅ User profile created successfully (attempt \(attempt))")
+                #endif
                 return
             } catch {
                 let errorString = String(describing: error)
+                #if DEBUG
                 print("❌ Attempt \(attempt) to create user profile failed: \(error)")
+                #endif
                 // Check for foreign key error code (23503) or message
                 if errorString.contains("violates foreign key constraint") || errorString.contains("23503") {
                     if attempt < maxAttempts {
@@ -138,7 +154,9 @@ class SupabaseService: ObservableObject {
                     }
                 }
                 // For other errors or after max attempts, break and log
+                #if DEBUG
                 print("❌ Failed to create user profile after \(attempt) attempts: \(error)")
+                #endif
                 break
             }
         }
@@ -342,7 +360,9 @@ class SupabaseService: ObservableObject {
                     callback(entries)
                 }
             } catch {
+                #if DEBUG
                 print("Error fetching meal entries: \(error)")
+                #endif
             }
         }
     }

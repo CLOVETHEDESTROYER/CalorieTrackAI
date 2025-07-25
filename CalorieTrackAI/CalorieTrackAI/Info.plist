@@ -4,6 +4,8 @@
 <dict>
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleDisplayName</key>
+    <string>CalTrack AI</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -28,7 +30,12 @@
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
     <key>UILaunchScreen</key>
-    <dict/>
+    <dict>
+        <key>UIColorName</key>
+        <string>AccentColor</string>
+        <key>UIImageName</key>
+        <string>AppIcon</string>
+    </dict>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
         <string>armv7</string>
@@ -54,6 +61,17 @@
     <string>CalTrack AI needs microphone access for voice input when logging foods.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>CalTrack AI uses speech recognition to convert your voice input into food entries.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>CalTrack AI needs photo library access to analyze food photos for nutrition information.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>CalTrack AI needs permission to save food photos to your library.</string>
+    
+    <!-- App Transport Security -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+    </dict>
     
     <!-- API Configuration - Values loaded from Config.xcconfig -->
     <!-- To set up: Copy Config.xcconfig.template to Config.xcconfig and add your keys -->

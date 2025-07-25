@@ -135,6 +135,13 @@ class FoodService: ObservableObject {
         return entries.count
     }
     
+    func getMealEntriesForDateRange(from startDate: Date, to endDate: Date) async throws -> [MealEntry] {
+        guard supabaseService.isAuthenticated else {
+            throw FoodServiceError.notAuthenticated
+        }
+        return try await supabaseService.getMealEntriesForDateRange(from: startDate, to: endDate)
+    }
+    
     // MARK: - Offline Support (Fallback to UserDefaults)
     
     private let userDefaults = UserDefaults.standard
@@ -192,7 +199,9 @@ class FoodService: ObservableObject {
             do {
                 try await addFood(food)
             } catch {
+                #if DEBUG
                 print("Failed to sync food: \(food.name), error: \(error)")
+                #endif
             }
         }
         

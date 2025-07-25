@@ -194,7 +194,9 @@ class DashboardViewModel: ObservableObject {
             fat = todaysFoods.reduce(0) { $0 + $1.fat }
             recentFoods = Array(todaysFoods.suffix(3))
             
+            #if DEBUG
             print("Failed to load today's data from server, using offline data: \(error)")
+            #endif
         }
     }
     

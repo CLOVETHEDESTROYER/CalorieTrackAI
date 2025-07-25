@@ -55,7 +55,9 @@ class HistoryViewModel: ObservableObject {
             // Fallback to offline data
             let startOfDay = Calendar.current.startOfDay(for: date)
             foods = foodService.getFoodsForDateOffline(startOfDay)
+            #if DEBUG
             print("Failed to load foods from server, using offline data: \(error)")
+            #endif
         }
     }
     

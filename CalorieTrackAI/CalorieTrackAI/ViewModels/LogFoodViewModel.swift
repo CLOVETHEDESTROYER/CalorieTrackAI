@@ -45,7 +45,9 @@ class LogFoodViewModel: ObservableObject {
             foodService.addFoodOffline(food)
             clearForm()
             showingSuccessAlert = true
+            #if DEBUG
             print("Added food offline: \(error)")
+            #endif
         }
     }
     
@@ -66,7 +68,9 @@ class LogFoodViewModel: ObservableObject {
     
     func openCamera() {
         // TODO: Implement camera functionality for food recognition
+        #if DEBUG
         print("Camera functionality not yet implemented")
+        #endif
     }
     
     func lookupFoodByBarcode(_ barcode: String) {
@@ -82,13 +86,17 @@ class LogFoodViewModel: ObservableObject {
                             case .success(let food):
                                 self?.populateFromFood(food)
                             case .failure(let error):
+                                #if DEBUG
                                 print("Barcode lookup failed: \(error)")
+                                #endif
                             }
                         }
                     }
                 }
             } catch {
+                #if DEBUG
                 print("Database barcode lookup failed: \(error)")
+                #endif
             }
         }
     }
