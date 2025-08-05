@@ -97,7 +97,7 @@ class DashboardViewModel: ObservableObject {
     
     // Calculate fat goal based on remaining calories after protein and carbs
     var fatGoal: Double {
-        guard let user = currentUser else { return (dailyGoal * 0.30) / 9 } // Fallback
+        guard currentUser != nil else { return (dailyGoal * 0.30) / 9 } // Fallback
         
         // Calculate protein and carb calories
         let proteinCalories = proteinGoal * 4
@@ -134,7 +134,6 @@ class DashboardViewModel: ObservableObject {
         guard let user = currentUser else { return "N/A" }
         
         let weight = user.weight
-        let unit = user.weightUnit.rawValue
         
         if user.weightUnit == .lb {
             return "\(Int(weight)) lb"

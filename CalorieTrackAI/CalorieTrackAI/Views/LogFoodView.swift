@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct LogFoodView: View {
     @StateObject private var viewModel = LogFoodViewModel()
@@ -11,6 +12,9 @@ struct LogFoodView: View {
     @State private var showingAIError = false
     @State private var aiErrorMessage = ""
     @State private var showLoginPrompt = false
+    @State private var showingImagePicker = false
+    @State private var selectedImage: UIImage?
+    @State private var imageAnalysisResult: MealAnalysis?
     // Focus states for keyboard management
     @FocusState private var quickAnalysisFieldFocused: Bool
     @FocusState private var foodNameFieldFocused: Bool
@@ -58,9 +62,20 @@ struct LogFoodView: View {
                     if supabaseService.isGuestMode {
                         showLoginPrompt = true
                     } else {
-                        viewModel.openCamera()
+                        showingImagePicker = true
                     }
                 }
+                
+                // Debug button for testing API access
+                #if DEBUG
+                QuickActionButton(
+                    title: "Test API",
+                    icon: "network",
+                    color: .purple
+                ) {
+                    testAPIAccess()
+                }
+                #endif
             }
         }
         .padding()
@@ -211,6 +226,11 @@ struct LogFoodView: View {
                     viewModel.lookupFoodByBarcode(barcode)
                 }
             }
+            .sheet(isPresented: $showingImagePicker) {
+                ImagePicker(selectedImage: $selectedImage, onImageSelected: { image in
+                    analyzeImage(image)
+                })
+            }
             .alert("Success", isPresented: $viewModel.showingSuccessAlert) {
                 Button("OK") { }
             } message: {
@@ -349,6 +369,64 @@ struct LogFoodView: View {
         caloriesFieldFocused = false
         servingSizeFieldFocused = false
     }
+    
+    private func analyzeImage(_ image: UIImage) {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            aiErrorMessage = "Failed to process image"
+            showingAIError = true
+            return
+        }
+        
+        Task {
+            do {
+                let analysis = try await openAIService.analyzeFoodImage(imageData)
+                await MainActor.run {
+                    imageAnalysisResult = analysis
+                    // Pre-fill the manual entry form with image analysis results
+                    viewModel.foodName = "Photo Analysis"
+                    viewModel.calories = analysis.totalCalories
+                    viewModel.protein = analysis.protein
+                    viewModel.carbs = analysis.carbohydrates
+                    viewModel.fat = analysis.fat
+                }
+            } catch {
+                await MainActor.run {
+                    // Provide more specific error messages
+                    if error.localizedDescription.contains("image_url only supported by certain models") {
+                        aiErrorMessage = "Image analysis requires GPT-4o model. Please check your OpenAI configuration."
+                    } else if error.localizedDescription.contains("invalid API key") {
+                        aiErrorMessage = "OpenAI API key is invalid or missing. Please check your configuration."
+                    } else if error.localizedDescription.contains("quota exceeded") {
+                        aiErrorMessage = "OpenAI API quota exceeded. Please check your billing."
+                    } else {
+                        aiErrorMessage = "Image analysis failed: \(error.localizedDescription)"
+                    }
+                    showingAIError = true
+                }
+            }
+        }
+    }
+    
+    private func testAPIAccess() {
+        Task {
+            do {
+                let success = try await openAIService.testAPIAccess()
+                await MainActor.run {
+                    if success {
+                        aiErrorMessage = "API test successful! GPT-4o access confirmed."
+                    } else {
+                        aiErrorMessage = "API test failed. Check your configuration."
+                    }
+                    showingAIError = true
+                }
+            } catch {
+                await MainActor.run {
+                    aiErrorMessage = "API test error: \(error.localizedDescription)"
+                    showingAIError = true
+                }
+            }
+        }
+    }
 }
 
 struct QuickActionButton: View {
@@ -372,6 +450,66 @@ struct QuickActionButton: View {
             .padding(.vertical, 12)
             .background(Color.white)
             .cornerRadius(8)
+        }
+    }
+}
+
+struct ImagePicker: UIViewControllerRepresentable {
+    @Binding var selectedImage: UIImage?
+    let onImageSelected: (UIImage) -> Void
+    @Environment(\.presentationMode) var presentationMode
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        
+        // Try camera first, fallback to photo library
+        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+            picker.sourceType = .camera
+            picker.cameraCaptureMode = .photo
+            picker.cameraDevice = .rear
+        } else if UIImagePickerController.isSourceTypeAvailable(.photoLibrary) {
+            picker.sourceType = .photoLibrary
+        } else {
+            picker.sourceType = .photoLibrary
+        }
+        
+        picker.allowsEditing = true
+        
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePicker
+        
+        init(_ parent: ImagePicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage {
+                parent.selectedImage = image
+                parent.onImageSelected(image)
+            }
+            parent.presentationMode.wrappedValue.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.presentationMode.wrappedValue.dismiss()
+        }
+        
+        // Handle camera errors gracefully
+        func imagePickerController(_ picker: UIImagePickerController, didFailWithError error: Error) {
+            #if DEBUG
+            print("Camera error: \(error.localizedDescription)")
+            #endif
+            parent.presentationMode.wrappedValue.dismiss()
         }
     }
 } 

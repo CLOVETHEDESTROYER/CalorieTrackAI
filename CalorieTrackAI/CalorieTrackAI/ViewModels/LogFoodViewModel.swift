@@ -68,8 +68,9 @@ class LogFoodViewModel: ObservableObject {
     
     func openCamera() {
         // TODO: Implement camera functionality for food recognition
+        // This will be implemented in the next step with UIImagePickerController
         #if DEBUG
-        print("Camera functionality not yet implemented")
+        print("Camera functionality will be implemented with image analysis")
         #endif
     }
     

@@ -189,15 +189,15 @@ struct EditProfileView: View {
             }
             .navigationTitle("Edit Profile")
             .onAppear(perform: updateCalorieGoal)
-            .onChange(of: user) { _ in updateCalorieGoal() }
-            .onChange(of: user.goalType) { _ in updateCalorieGoal() }
-            .onChange(of: user.bodyFatPercent) { _ in updateCalorieGoal() }
-            .onChange(of: user.weeklyWeightChange) { _ in updateCalorieGoal() }
-            .onChange(of: user.weight) { _ in updateCalorieGoal() }
-            .onChange(of: user.height) { _ in updateCalorieGoal() }
-            .onChange(of: user.weightUnit) { _ in updateCalorieGoal() }
-            .onChange(of: user.heightUnit) { _ in updateCalorieGoal() }
-            .onChange(of: user.age) { _ in updateCalorieGoal() }
+            .onChange(of: user) { _, _ in updateCalorieGoal() }
+            .onChange(of: user.goalType) { _, _ in updateCalorieGoal() }
+            .onChange(of: user.bodyFatPercent) { _, _ in updateCalorieGoal() }
+            .onChange(of: user.weeklyWeightChange) { _, _ in updateCalorieGoal() }
+            .onChange(of: user.weight) { _, _ in updateCalorieGoal() }
+            .onChange(of: user.height) { _, _ in updateCalorieGoal() }
+            .onChange(of: user.weightUnit) { _, _ in updateCalorieGoal() }
+            .onChange(of: user.heightUnit) { _, _ in updateCalorieGoal() }
+            .onChange(of: user.age) { _, _ in updateCalorieGoal() }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

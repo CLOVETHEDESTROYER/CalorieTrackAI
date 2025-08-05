@@ -8,7 +8,7 @@ class OpenAIService: ObservableObject {
     
     private let apiKey: String
     private let baseURL = "https://api.openai.com/v1"
-    private let model = "gpt-4o-mini" // Cost-effective model for nutrition tasks
+    private let model = "gpt-4o-2024-08-06" // More accurate model for nutrition analysis
     
     private init() {
         // Load configuration from Info.plist (which reads from Config.xcconfig)
@@ -51,7 +51,7 @@ class OpenAIService: ObservableObject {
             ]
         )
         
-        guard let content = response.choices.first?.message.content else {
+        guard case .left(let content) = response.choices.first?.message.content else {
             throw OpenAIError.invalidResponse
         }
         
@@ -79,7 +79,7 @@ class OpenAIService: ObservableObject {
             ]
         )
         
-        guard let content = response.choices.first?.message.content else {
+        guard case .left(let content) = response.choices.first?.message.content else {
             throw OpenAIError.invalidResponse
         }
         
@@ -109,11 +109,148 @@ class OpenAIService: ObservableObject {
             ]
         )
         
-        guard let content = response.choices.first?.message.content else {
+        guard case .left(let content) = response.choices.first?.message.content else {
             throw OpenAIError.invalidResponse
         }
         
         return try parseFoodRecognitionResponse(content)
+    }
+    
+    // MARK: - API Testing
+    
+    func testAPIAccess() async throws -> Bool {
+        #if DEBUG
+        print("Testing OpenAI API access...")
+        #endif
+        
+        let testRequest = ChatCompletionRequest(
+            model: "gpt-4o-2024-08-06", // Use the same model version for consistency
+            messages: [
+                ChatMessage(role: "user", content: "Hello")
+            ],
+            temperature: 0.3,
+            max_tokens: 10
+        )
+        
+        let url = URL(string: "\(baseURL)/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(testRequest)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OpenAIError.networkError
+        }
+        
+        #if DEBUG
+        print("API Test Response Status: \(httpResponse.statusCode)")
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("API Test Response: \(responseString)")
+        }
+        #endif
+        
+        return httpResponse.statusCode == 200
+    }
+    
+    // MARK: - Image Analysis
+    
+    func analyzeFoodImage(_ imageData: Data) async throws -> MealAnalysis {
+        // Check if current model supports vision
+        guard model == "gpt-4o" || model == "gpt-4o-2024-08-06" else {
+            throw OpenAIError.featureNotAvailable("Image analysis requires GPT-4o model. Current model: \(model)")
+        }
+        
+        #if DEBUG
+        print("Starting image analysis with model: \(model)")
+        print("Image data size: \(imageData.count) bytes")
+        #endif
+        
+        isLoading = true
+        defer { isLoading = false }
+        
+        // Convert image to base64
+        let base64Image = imageData.base64EncodedString()
+        
+        let prompt = """
+        Analyze this food image and provide detailed nutritional information.
+        Please provide:
+        1. Total estimated calories
+        2. Protein (grams)
+        3. Carbohydrates (grams)
+        4. Fat (grams)
+        5. Fiber (grams, if applicable)
+        6. List of identified food items with individual nutrition
+        7. Confidence level for the analysis (0-100)
+        8. Any assumptions made about portion sizes
+        
+        Be as accurate as possible based on visual analysis.
+        """
+        
+        // Create a simplified vision request structure
+        let visionRequest = VisionRequest(
+            model: "gpt-4o-2024-08-06", // Use the specific model version that supports vision
+            messages: [
+                VisionMessage(
+                    role: "system",
+                    content: mealAnalysisSystemPrompt
+                ),
+                VisionMessage(
+                    role: "user",
+                    content: [
+                        VisionContent(
+                            type: "text",
+                            text: prompt
+                        ),
+                        VisionContent(
+                            type: "image_url",
+                            image_url: VisionImageUrl(
+                                url: "data:image/jpeg;base64,\(base64Image)"
+                            )
+                        )
+                    ]
+                )
+            ],
+            temperature: 0.3,
+            max_tokens: 1500
+        )
+        
+        #if DEBUG
+        print("Sending vision request with \(visionRequest.messages.count) messages")
+        if let requestData = try? JSONEncoder().encode(visionRequest),
+           let requestString = String(data: requestData, encoding: .utf8) {
+            print("Request JSON: \(requestString)")
+        }
+        #endif
+        
+        let response = try await sendVisionRequest(visionRequest)
+
+        // Extract the content from the response
+        guard let message = response.choices.first?.message else {
+            throw OpenAIError.invalidResponse
+        }
+
+        // Handle both string and array content types
+        let content: String
+        switch message.content {
+        case .left(let stringContent):
+            content = stringContent
+        case .right(let arrayContent):
+            // If it's an array, try to extract text content
+            if let textContent = arrayContent.first(where: { $0.text != nil })?.text {
+                content = textContent
+            } else {
+                throw OpenAIError.invalidResponse
+            }
+        }
+
+        #if DEBUG
+        print("Extracted content: \(content)")
+        #endif
+
+        return try parseMealAnalysisResponse(content)
     }
     
     // MARK: - Private API Methods
@@ -147,6 +284,95 @@ class OpenAIService: ObservableObject {
         guard httpResponse.statusCode == 200 else {
             if let errorData = try? JSONDecoder().decode(OpenAIErrorResponse.self, from: data) {
                 throw OpenAIError.apiError(errorData.error.message)
+            }
+            throw OpenAIError.httpError(httpResponse.statusCode)
+        }
+        
+        return try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
+    }
+    
+    private func sendVisionCompletion(messages: [ChatMessage]) async throws -> ChatCompletionResponse {
+        guard !apiKey.isEmpty && apiKey != "your-openai-api-key-here" else {
+            throw OpenAIError.invalidAPIKey
+        }
+        
+        let url = URL(string: "\(baseURL)/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Use gpt-4o specifically for vision (not the dynamic model)
+        let requestBody = ChatCompletionRequest(
+            model: "gpt-4o", // Force gpt-4o for vision
+            messages: messages,
+            temperature: 0.3,
+            max_tokens: 1500
+        )
+        
+        request.httpBody = try JSONEncoder().encode(requestBody)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OpenAIError.networkError
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            if let errorData = try? JSONDecoder().decode(OpenAIErrorResponse.self, from: data) {
+                throw OpenAIError.apiError(errorData.error.message)
+            }
+            throw OpenAIError.httpError(httpResponse.statusCode)
+        }
+        
+        return try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
+    }
+    
+    private func sendVisionRequest(_ visionRequest: VisionRequest) async throws -> ChatCompletionResponse {
+        guard !apiKey.isEmpty && apiKey != "your-openai-api-key-here" else {
+            throw OpenAIError.invalidAPIKey
+        }
+        
+        let url = URL(string: "\(baseURL)/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 60 // 60 second timeout
+        
+        request.httpBody = try JSONEncoder().encode(visionRequest)
+        
+        #if DEBUG
+        print("Sending vision request to OpenAI...")
+        print("Request URL: \(url)")
+        print("Request headers: \(request.allHTTPHeaderFields ?? [:])")
+        #endif
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OpenAIError.networkError
+        }
+        
+        #if DEBUG
+        print("Vision API Response Status: \(httpResponse.statusCode)")
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("Vision API Response: \(responseString)")
+        }
+        #endif
+        
+        guard httpResponse.statusCode == 200 else {
+            #if DEBUG
+            print("OpenAI Vision API Error - Status: \(httpResponse.statusCode)")
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("Vision Error Response: \(responseString)")
+            }
+            #endif
+            
+            if let errorData = try? JSONDecoder().decode(OpenAIErrorResponse.self, from: data) {
+                let errorMessage = errorData.error.message
+                print("OpenAI Vision API Error: \(errorMessage)")
+                throw OpenAIError.apiError(errorMessage)
             }
             throw OpenAIError.httpError(httpResponse.statusCode)
         }
@@ -225,26 +451,90 @@ class OpenAIService: ObservableObject {
         var carbs: Double = 0
         var fat: Double = 0
         var fiber: Double = 0
-        var confidence: Int = 80
+        var confidence: Int = 50 // Lower default confidence
         let foodItems: [AnalyzedFood] = []
+        
+        // Track if we found specific nutrition data
+        var foundCalories = false
+        var foundProtein = false
+        var foundCarbs = false
+        var foundFat = false
+        
+        #if DEBUG
+        print("Parsing content lines:")
+        for (index, line) in lines.enumerated() {
+            print("Line \(index): \(line)")
+        }
+        #endif
         
         for line in lines {
             let lowercased = line.lowercased()
             
             if lowercased.contains("calorie") {
-                calories = extractNumber(from: line) ?? 0
+                let extracted = extractNumber(from: line) ?? 0
+                calories = extracted
+                foundCalories = true
+                #if DEBUG
+                print("Found calories: \(extracted) from line: \(line)")
+                #endif
             } else if lowercased.contains("protein") {
-                protein = extractNumber(from: line) ?? 0
+                let extracted = extractNumber(from: line) ?? 0
+                protein = extracted
+                foundProtein = true
+                #if DEBUG
+                print("Found protein: \(extracted) from line: \(line)")
+                #endif
             } else if lowercased.contains("carbohydrate") {
-                carbs = extractNumber(from: line) ?? 0
+                let extracted = extractNumber(from: line) ?? 0
+                carbs = extracted
+                foundCarbs = true
+                #if DEBUG
+                print("Found carbs: \(extracted) from line: \(line)")
+                #endif
             } else if lowercased.contains("fat") && !lowercased.contains("saturated") {
-                fat = extractNumber(from: line) ?? 0
+                let extracted = extractNumber(from: line) ?? 0
+                fat = extracted
+                foundFat = true
+                #if DEBUG
+                print("Found fat: \(extracted) from line: \(line)")
+                #endif
             } else if lowercased.contains("fiber") {
-                fiber = extractNumber(from: line) ?? 0
+                let extracted = extractNumber(from: line) ?? 0
+                fiber = extracted
+                #if DEBUG
+                print("Found fiber: \(extracted) from line: \(line)")
+                #endif
             } else if lowercased.contains("confidence") {
-                confidence = Int(extractNumber(from: line) ?? 80)
+                let extractedConfidence = extractNumber(from: line) ?? 50
+                confidence = Int(max(0, min(100, extractedConfidence))) // Clamp to 0-100
+                #if DEBUG
+                print("Found confidence: \(confidence) from line: \(line)")
+                #endif
             }
         }
+        
+        // Calculate confidence based on data completeness
+        if confidence == 50 { // Only adjust if we didn't find explicit confidence
+            var dataPoints = 0
+            if foundCalories { dataPoints += 1 }
+            if foundProtein { dataPoints += 1 }
+            if foundCarbs { dataPoints += 1 }
+            if foundFat { dataPoints += 1 }
+            
+            // Base confidence on how much data we found
+            switch dataPoints {
+            case 0: confidence = 10  // No nutrition data found
+            case 1: confidence = 25  // Only calories found
+            case 2: confidence = 40  // Calories + one macro
+            case 3: confidence = 60  // Calories + two macros
+            case 4: confidence = 75  // All basic nutrition data found
+            default: confidence = 75
+            }
+        }
+        
+        #if DEBUG
+        print("Final parsed values - Calories: \(calories), Protein: \(protein), Carbs: \(carbs), Fat: \(fat), Fiber: \(fiber), Confidence: \(confidence)")
+        #endif
         
         return MealAnalysis(
             totalCalories: calories,
@@ -301,13 +591,25 @@ class OpenAIService: ObservableObject {
     // MARK: - Helper Methods
     
     private func extractNumber(from text: String) -> Double? {
-        let pattern = #"(\d+(?:\.\d+)?)"#
-        let regex = try? NSRegularExpression(pattern: pattern)
-        let range = NSRange(text.startIndex..., in: text)
+        // Look for numbers followed by common nutrition units
+        let patterns = [
+            #"(\d+(?:\.\d+)?)\s*(?:kcal|calories?|cal)"#,  // calories
+            #"(\d+(?:\.\d+)?)\s*(?:g|grams?)"#,            // grams
+            #"(\d+(?:\.\d+)?)\s*(?:%)"#,                   // percentages
+            #"(\d+(?:\.\d+)?)"#                            // any number (fallback)
+        ]
         
-        if let match = regex?.firstMatch(in: text, range: range) {
-            let matchRange = Range(match.range, in: text)!
-            return Double(text[matchRange])
+        for pattern in patterns {
+            let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive)
+            let range = NSRange(text.startIndex..., in: text)
+            
+            if let match = regex?.firstMatch(in: text, range: range) {
+                let matchRange = Range(match.range(at: 1), in: text)!
+                let numberString = String(text[matchRange])
+                if let number = Double(numberString) {
+                    return number
+                }
+            }
         }
         
         return nil
@@ -346,7 +648,25 @@ class OpenAIService: ObservableObject {
     // MARK: - System Prompts
     
     private let mealAnalysisSystemPrompt = """
-    You are a professional nutritionist and dietitian. Your task is to analyze meal descriptions and provide accurate nutritional information. Use standard nutritional databases and be conservative in your estimates. Always mention your confidence level and any assumptions made.
+    You are a professional nutritionist and dietitian with expertise in food analysis. Your task is to analyze meal descriptions and provide accurate nutritional information.
+
+    Guidelines:
+    1. Use standard nutritional databases and USDA food composition data
+    2. Be conservative in your estimates - it's better to underestimate than overestimate
+    3. Consider typical serving sizes unless specific quantities are mentioned
+    4. Provide confidence levels based on:
+       - Specificity of the description
+       - Commonality of the food items
+       - Clarity of portion sizes mentioned
+    5. Always mention assumptions made about portion sizes or preparation methods
+    6. For confidence ratings:
+       - 90-100%: Very specific foods with clear portions
+       - 70-89%: Common foods with reasonable estimates
+       - 50-69%: General foods with estimated portions
+       - 30-49%: Vague descriptions or unusual foods
+       - 10-29%: Very unclear or incomplete descriptions
+
+    Format your response clearly with each nutrition component on a separate line.
     """
     
     private let mealSuggestionSystemPrompt = """
@@ -450,7 +770,116 @@ struct ChatCompletionRequest: Codable {
 
 struct ChatMessage: Codable {
     let role: String
-    let content: String
+    let content: Either<String, [ChatMessageContent]>
+    
+    init(role: String, content: String) {
+        self.role = role
+        self.content = .left(content)
+    }
+    
+    init(role: String, content: [ChatMessageContent]) {
+        self.role = role
+        self.content = .right(content)
+    }
+}
+
+struct ChatMessageContent: Codable {
+    let type: String
+    let text: String?
+    let imageUrl: ImageUrl?
+    
+    init(type: String, text: String) {
+        self.type = type
+        self.text = text
+        self.imageUrl = nil
+    }
+    
+    init(type: String, imageUrl: ImageUrl) {
+        self.type = type
+        self.text = nil
+        self.imageUrl = imageUrl
+    }
+}
+
+struct ImageUrl: Codable {
+    let url: String
+}
+
+// Simplified vision request structures
+struct VisionRequest: Codable {
+    let model: String
+    let messages: [VisionMessage]
+    let temperature: Double
+    let max_tokens: Int
+}
+
+struct VisionMessage: Codable {
+    let role: String
+    let content: Either<String, [VisionContent]>
+    
+    init(role: String, content: String) {
+        self.role = role
+        self.content = .left(content)
+    }
+    
+    init(role: String, content: [VisionContent]) {
+        self.role = role
+        self.content = .right(content)
+    }
+}
+
+struct VisionContent: Codable {
+    let type: String
+    let text: String?
+    let image_url: VisionImageUrl?
+    
+    enum CodingKeys: String, CodingKey {
+        case type
+        case text
+        case image_url
+    }
+    
+    init(type: String, text: String) {
+        self.type = type
+        self.text = text
+        self.image_url = nil
+    }
+    
+    init(type: String, image_url: VisionImageUrl) {
+        self.type = type
+        self.text = nil
+        self.image_url = image_url
+    }
+}
+
+struct VisionImageUrl: Codable {
+    let url: String
+}
+
+enum Either<L: Codable, R: Codable>: Codable {
+    case left(L)
+    case right(R)
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let left = try? container.decode(L.self) {
+            self = .left(left)
+        } else if let right = try? container.decode(R.self) {
+            self = .right(right)
+        } else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Neither L nor R could be decoded")
+        }
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .left(let left):
+            try container.encode(left)
+        case .right(let right):
+            try container.encode(right)
+        }
+    }
 }
 
 struct ChatCompletionResponse: Codable {
@@ -480,6 +909,7 @@ enum OpenAIError: LocalizedError {
     case apiError(String)
     case httpError(Int)
     case parsingError
+    case featureNotAvailable(String)
     
     var errorDescription: String? {
         switch self {
@@ -495,6 +925,8 @@ enum OpenAIError: LocalizedError {
             return "HTTP error: \(code)"
         case .parsingError:
             return "Failed to parse response"
+        case .featureNotAvailable(let message):
+            return message
         }
     }
 } 

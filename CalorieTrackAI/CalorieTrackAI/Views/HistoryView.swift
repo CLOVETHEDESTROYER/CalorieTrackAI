@@ -12,7 +12,7 @@ struct HistoryView: View {
                     .datePickerStyle(CompactDatePickerStyle())
                     .padding()
                     .background(Color.gray.opacity(0.1))
-                    .onChange(of: selectedDate) { newDate in
+                    .onChange(of: selectedDate) { oldDate, newDate in
                         Task {
                             await viewModel.loadFoodsForDate(newDate)
                         }
