@@ -79,13 +79,22 @@ struct LogFoodView: View {
             }
         }
         .padding()
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(12)
+        .glassCard(tint: .neutral, cornerRadius: 12)
     }
     
     var body: some View {
         NavigationView {
             ZStack {
+                // Prominent glass background for iOS 18+
+                if #available(iOS 18.0, *) {
+                    LinearGradient(
+                        colors: [.purple.opacity(0.2), .blue.opacity(0.1), .orange.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
+                }
+                
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -104,36 +113,32 @@ struct LogFoodView: View {
                                     .font(.headline)
                                     .fontWeight(.semibold)
                             }
-                            TextField("Describe your meal (e.g., 'grilled chicken with rice and vegetables')", text: $quickAnalysisText, axis: .vertical)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .lineLimit(2...4)
-                                .disabled(supabaseService.isGuestMode)
-                                .focused($quickAnalysisFieldFocused)
+                            
+                            GlassTextEditor(
+                                "Describe your meal (e.g., 'grilled chicken with rice and vegetables')",
+                                text: $quickAnalysisText,
+                                tint: .purple,
+                                minHeight: 80,
+                                isDisabled: supabaseService.isGuestMode
+                            )
+                            .focused($quickAnalysisFieldFocused)
+                            
                             HStack(spacing: 12) {
-                                Button(action: {
+                                GlassButton(
+                                    openAIService.isLoading ? "Analyzing..." : "Analyze",
+                                    icon: openAIService.isLoading ? nil : "sparkles",
+                                    tint: .purple,
+                                    style: .secondary,
+                                    isLoading: openAIService.isLoading,
+                                    isDisabled: quickAnalysisText.isEmpty || supabaseService.isGuestMode
+                                ) {
                                     if supabaseService.isGuestMode {
                                         showLoginPrompt = true
                                     } else {
                                         analyzeQuickMeal()
                                     }
-                                }) {
-                                    HStack {
-                                        if openAIService.isLoading {
-                                            ProgressView()
-                                                .scaleEffect(0.7)
-                                        } else {
-                                            Image(systemName: "sparkles")
-                                        }
-                                        Text(openAIService.isLoading ? "Analyzing..." : "Analyze")
-                                    }
-                                    .font(.caption)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(quickAnalysisText.isEmpty ? Color.gray : Color.purple)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(8)
                                 }
-                                .disabled(quickAnalysisText.isEmpty || openAIService.isLoading || supabaseService.isGuestMode)
+                                
                                 if quickAnalysisResult != nil {
                                     Button("Clear") {
                                         quickAnalysisText = ""
@@ -148,8 +153,8 @@ struct LogFoodView: View {
                             }
                         }
                         .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(12)
+                        .glassCard(tint: .purple, cornerRadius: 12)
+                        .glassBorder(tint: .purple, cornerRadius: 12)
                         
                         // Manual Entry
                         VStack(alignment: .leading, spacing: 16) {
@@ -157,27 +162,43 @@ struct LogFoodView: View {
                                 .font(.headline)
                                 .fontWeight(.semibold)
                             
-                            TextField("Food name", text: $viewModel.foodName)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .disabled(supabaseService.isGuestMode)
-                                .focused($foodNameFieldFocused)
+                            GlassTextField(
+                                "Food name",
+                                text: $viewModel.foodName,
+                                icon: "fork.knife",
+                                tint: .blue,
+                                isDisabled: supabaseService.isGuestMode
+                            )
+                            .focused($foodNameFieldFocused)
                             
-                            HStack {
-                                TextField("Calories", value: $viewModel.calories, format: .number)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    #if os(iOS)
-                                    .keyboardType(.decimalPad)
-                                    #endif
-                                    .disabled(supabaseService.isGuestMode)
-                                    .focused($caloriesFieldFocused)
+                            HStack(spacing: 12) {
+                                GlassNumberField(
+                                    "Calories",
+                                    value: $viewModel.calories,
+                                    icon: "flame.fill",
+                                    tint: .orange,
+                                    isDisabled: supabaseService.isGuestMode
+                                )
+                                .focused($caloriesFieldFocused)
                                 
-                                TextField("Serving size", text: $viewModel.servingSize)
-                                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                                    .disabled(supabaseService.isGuestMode)
-                                    .focused($servingSizeFieldFocused)
+                                GlassTextField(
+                                    "Serving size",
+                                    text: $viewModel.servingSize,
+                                    icon: "scalemass.fill",
+                                    tint: .green,
+                                    isDisabled: supabaseService.isGuestMode
+                                )
+                                .focused($servingSizeFieldFocused)
                             }
                             
-                            Button(action: {
+                            GlassButton(
+                                viewModel.isLoading ? "Adding..." : "Add Food",
+                                icon: viewModel.isLoading ? nil : "plus.circle.fill",
+                                tint: .blue,
+                                style: .primary,
+                                isLoading: viewModel.isLoading,
+                                isDisabled: !viewModel.isValidEntry || supabaseService.isGuestMode
+                            ) {
                                 if supabaseService.isGuestMode {
                                     showLoginPrompt = true
                                 } else {
@@ -185,27 +206,10 @@ struct LogFoodView: View {
                                         await viewModel.addFood()
                                     }
                                 }
-                            }) {
-                                HStack {
-                                    if viewModel.isLoading {
-                                        ProgressView()
-                                            .scaleEffect(0.8)
-                                        Text("Adding...")
-                                    } else {
-                                        Text("Add Food")
-                                    }
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(viewModel.isValidEntry && !viewModel.isLoading && !supabaseService.isGuestMode ? Color.blue : Color.gray)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
                             }
-                            .disabled(!viewModel.isValidEntry || viewModel.isLoading || supabaseService.isGuestMode)
                         }
                         .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(12)
+                        .glassCard(tint: .neutral, cornerRadius: 12)
                         Spacer(minLength: 0)
                     }
                     .padding()
@@ -280,25 +284,18 @@ struct LogFoodView: View {
                 nutritionChip("F", value: Int(analysis.fat), color: .yellow)
             }
             
-            Button(action: {
+            GlassButton(
+                "Add to Log",
+                icon: "plus.circle.fill",
+                tint: .green,
+                style: .compact
+            ) {
                 addQuickAnalysisToLog(analysis)
-            }) {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                    Text("Add to Log")
-                }
-                .font(.caption)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.green)
-                .foregroundColor(.white)
-                .cornerRadius(8)
             }
         }
         .padding(12)
-        .background(Color.white)
-        .cornerRadius(10)
-        .shadow(radius: 1)
+        .glassBackground(tint: .neutral, cornerRadius: 10)
+        .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
     
     private func nutritionChip(_ label: String, value: Int, color: Color) -> some View {
@@ -448,9 +445,37 @@ struct QuickActionButton: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(Color.white)
+            .background {
+                if #available(iOS 18.0, *) {
+                    GlassCard(tint: glassTintForColor(color), intensity: .subtle)
+                        .cornerRadius(8)
+                } else {
+                    Color.white
+                        .cornerRadius(8)
+                }
+            }
             .cornerRadius(8)
+            .overlay {
+                if #available(iOS 18.0, *) {
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(
+                            color.opacity(0.3),
+                            lineWidth: 1
+                        )
+                } else {
+                    EmptyView()
+                }
+            }
         }
+    }
+    
+    private func glassTintForColor(_ color: Color) -> GlassTint {
+        if color == .blue { return .blue }
+        if color == .green { return .green }
+        if color == .orange { return .orange }
+        if color == .purple { return .purple }
+        if color == .red { return .red }
+        return .neutral
     }
 }
 

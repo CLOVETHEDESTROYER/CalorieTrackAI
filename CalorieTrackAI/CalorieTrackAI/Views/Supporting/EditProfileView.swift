@@ -72,6 +72,17 @@ struct EditProfileView: View {
     
     var body: some View {
         NavigationView {
+            ZStack {
+                // Prominent glass background for iOS 18+
+                if #available(iOS 18.0, *) {
+                    LinearGradient(
+                        colors: [.blue.opacity(0.15), .purple.opacity(0.1), .green.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
+                }
+                
             Form {
                 Section(header: Text("Personal Information")) {
                     TextField("Name", text: $user.name)
@@ -186,6 +197,8 @@ struct EditProfileView: View {
                         }
                     }
                 }
+            }
+            .scrollContentBackground(.hidden)
             }
             .navigationTitle("Edit Profile")
             .onAppear(perform: updateCalorieGoal)

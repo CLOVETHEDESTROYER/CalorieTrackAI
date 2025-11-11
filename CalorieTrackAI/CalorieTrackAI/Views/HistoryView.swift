@@ -6,12 +6,23 @@ struct HistoryView: View {
     
     var body: some View {
         NavigationView {
+            ZStack {
+                // Prominent glass background for iOS 18+
+                if #available(iOS 18.0, *) {
+                    LinearGradient(
+                        colors: [.orange.opacity(0.15), .blue.opacity(0.1), .green.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
+                }
+                
             VStack(spacing: 0) {
                 // Date Picker
                 DatePicker("Select Date", selection: $selectedDate, displayedComponents: .date)
                     .datePickerStyle(CompactDatePickerStyle())
                     .padding()
-                    .background(Color.gray.opacity(0.1))
+                    .glassCard(tint: .neutral, cornerRadius: 0)
                     .onChange(of: selectedDate) { oldDate, newDate in
                         Task {
                             await viewModel.loadFoodsForDate(newDate)
@@ -56,7 +67,9 @@ struct HistoryView: View {
                             }
                         }
                         .padding()
-                        .background(Color.gray.opacity(0.1))
+                        .glassCard(tint: .orange, cornerRadius: 12)
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
                     }
                     
                     // Food List
@@ -99,7 +112,9 @@ struct HistoryView: View {
                         }
                     }
                     .listStyle(PlainListStyle())
+                    .scrollContentBackground(.hidden)
                 }
+            }
             }
             .navigationTitle("History")
             .task {

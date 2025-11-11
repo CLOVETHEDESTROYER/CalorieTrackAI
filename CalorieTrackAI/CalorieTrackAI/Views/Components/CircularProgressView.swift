@@ -101,8 +101,7 @@ struct MacrosView: View {
             }
         }
         .padding()
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(12)
+        .glassCard(tint: .neutral, cornerRadius: 12)
     }
 }
 

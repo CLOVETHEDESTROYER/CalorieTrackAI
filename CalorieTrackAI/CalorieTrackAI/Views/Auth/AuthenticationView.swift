@@ -30,6 +30,17 @@ struct SignInView: View {
     @State private var showError = false
     
     var body: some View {
+        ZStack {
+            // Prominent glass background for iOS 18+
+            if #available(iOS 18.0, *) {
+                LinearGradient(
+                    colors: [.blue.opacity(0.3), .purple.opacity(0.2), .cyan.opacity(0.1)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+            }
+            
         VStack(spacing: 24) {
             // App Logo and Title
             VStack(spacing: 16) {
@@ -51,30 +62,32 @@ struct SignInView: View {
             
             // Sign In Form
             VStack(spacing: 16) {
-                TextField("Email", text: $email)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    #if os(iOS)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
-                    #endif
+                GlassTextField(
+                    "Email",
+                    text: $email,
+                    icon: "envelope.fill",
+                    tint: .blue,
+                    keyboardType: .emailAddress
+                )
                 
-                SecureField("Password", text: $password)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                GlassTextField(
+                    "Password",
+                    text: $password,
+                    icon: "lock.fill",
+                    tint: .blue,
+                    isSecure: true
+                )
                 
-                Button(action: signIn) {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    } else {
-                        Text("Sign In")
-                    }
+                GlassButton(
+                    isLoading ? "Signing In..." : "Sign In",
+                    icon: isLoading ? nil : "arrow.right.circle.fill",
+                    tint: .blue,
+                    style: .primary,
+                    isLoading: isLoading,
+                    isDisabled: email.isEmpty || password.isEmpty
+                ) {
+                    signIn()
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(10)
-                .disabled(isLoading || email.isEmpty || password.isEmpty)
                 
                 Button("Forgot Password?") {
                     // TODO: Implement password reset
@@ -96,6 +109,7 @@ struct SignInView: View {
                 .foregroundColor(.blue)
             }
             .padding(.bottom, 32)
+        }
         }
         .navigationBarHidden(true)
         .alert("Error", isPresented: $showError) {
@@ -141,6 +155,17 @@ struct SignUpView: View {
     
     var body: some View {
         NavigationView {
+            ZStack {
+                // Prominent glass background for iOS 18+
+                if #available(iOS 18.0, *) {
+                    LinearGradient(
+                        colors: [.green.opacity(0.2), .blue.opacity(0.2), .purple.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
+                }
+                
             ScrollView {
                 VStack(spacing: 24) {
                     // Header
@@ -164,24 +189,36 @@ struct SignUpView: View {
                     
                     // Sign Up Form
                     VStack(spacing: 16) {
-                        TextField("Full Name", text: $name)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            #if os(iOS)
-                            .textInputAutocapitalization(.words)
-                            #endif
+                        GlassTextField(
+                            "Full Name",
+                            text: $name,
+                            icon: "person.fill",
+                            tint: .green
+                        )
                         
-                        TextField("Email", text: $email)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            #if os(iOS)
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.emailAddress)
-                            #endif
+                        GlassTextField(
+                            "Email",
+                            text: $email,
+                            icon: "envelope.fill",
+                            tint: .blue,
+                            keyboardType: .emailAddress
+                        )
                         
-                        SecureField("Password", text: $password)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                        GlassTextField(
+                            "Password",
+                            text: $password,
+                            icon: "lock.fill",
+                            tint: .purple,
+                            isSecure: true
+                        )
                         
-                        SecureField("Confirm Password", text: $confirmPassword)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                        GlassTextField(
+                            "Confirm Password",
+                            text: $confirmPassword,
+                            icon: "lock.fill",
+                            tint: .purple,
+                            isSecure: true
+                        )
                         
                         if !password.isEmpty && password.count < 6 {
                             Text("Password must be at least 6 characters")
@@ -197,20 +234,16 @@ struct SignUpView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         
-                        Button(action: signUp) {
-                            if isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            } else {
-                                Text("Create Account")
-                            }
+                        GlassButton(
+                            isLoading ? "Creating Account..." : "Create Account",
+                            icon: isLoading ? nil : "person.badge.plus",
+                            tint: .green,
+                            style: .primary,
+                            isLoading: isLoading,
+                            isDisabled: !isFormValid
+                        ) {
+                            signUp()
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(isFormValid ? Color.blue : Color.gray)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                        .disabled(!isFormValid || isLoading)
                     }
                     .padding(.horizontal, 32)
                     
@@ -225,6 +258,7 @@ struct SignUpView: View {
                     
                     Spacer(minLength: 20)
                 }
+            }
             }
             .navigationBarItems(
                 leading: Button("Back") {

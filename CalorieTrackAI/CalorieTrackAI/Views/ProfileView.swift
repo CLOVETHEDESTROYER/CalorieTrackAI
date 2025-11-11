@@ -6,6 +6,17 @@ struct ProfileView: View {
     
     var body: some View {
         NavigationView {
+            ZStack {
+                // Prominent glass background for iOS 18+
+                if #available(iOS 18.0, *) {
+                    LinearGradient(
+                        colors: [.blue.opacity(0.15), .green.opacity(0.1), .purple.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
+                }
+                
             List {
                 // Profile Header
                 Section {
@@ -87,8 +98,8 @@ struct ProfileView: View {
                         }
                     }
                     .padding()
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(12)
+                    .glassCard(tint: .blue, cornerRadius: 12)
+                    .glassBorder(tint: .blue, cornerRadius: 12)
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                 }
@@ -163,6 +174,8 @@ struct ProfileView: View {
                     }
                     .foregroundColor(.red)
                 }
+            }
+            .scrollContentBackground(.hidden)
             }
             .navigationTitle("Profile")
             .sheet(isPresented: $showingEditProfile, onDismiss: {

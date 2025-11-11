@@ -5,6 +5,17 @@ struct DashboardView: View {
     
     var body: some View {
         NavigationView {
+            ZStack {
+                // Prominent glass background for iOS 18+
+                if #available(iOS 18.0, *) {
+                    LinearGradient(
+                        colors: [.blue.opacity(0.2), .purple.opacity(0.1), .green.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
+                }
+                
             ScrollView {
                 VStack(spacing: 20) {
                     // Daily Calorie Goal Card
@@ -42,12 +53,8 @@ struct DashboardView: View {
                         }
                     }
                     .padding()
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                    )
+                    .glassCard(tint: .blue, cornerRadius: 12)
+                    .glassBorder(tint: .blue, cornerRadius: 12)
                     
                     // User Stats Card
                     VStack(alignment: .leading, spacing: 12) {
@@ -85,12 +92,8 @@ struct DashboardView: View {
                         }
                     }
                     .padding()
-                    .background(Color.green.opacity(0.1))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.green.opacity(0.3), lineWidth: 1)
-                    )
+                    .glassCard(tint: .green, cornerRadius: 12)
+                    .glassBorder(tint: .green, cornerRadius: 12)
                     
                     // Daily Progress Card
                     VStack(alignment: .leading, spacing: 12) {
@@ -123,8 +126,7 @@ struct DashboardView: View {
                         }
                     }
                     .padding()
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(12)
+                    .glassCard(tint: .neutral, cornerRadius: 12)
                     
                     // Macros Summary
                     if !viewModel.isLoading {
@@ -158,10 +160,10 @@ struct DashboardView: View {
                         }
                     }
                     .padding()
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(12)
+                    .glassCard(tint: .neutral, cornerRadius: 12)
                 }
                 .padding()
+            }
             }
             .navigationTitle("Dashboard")
             .refreshable {

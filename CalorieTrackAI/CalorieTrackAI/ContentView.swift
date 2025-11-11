@@ -31,18 +31,22 @@ struct ContentView: View {
                             .font(.caption)
                             .foregroundColor(.white)
                         Spacer()
-                        Button(action: { showAuth.wrappedValue = true }) {
-                            Text("Sign Up / Log In")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.white.opacity(0.2))
-                                .cornerRadius(8)
+                        GlassButton(
+                            "Sign Up / Log In",
+                            tint: .blue,
+                            style: .compact
+                        ) {
+                            showAuth.wrappedValue = true
                         }
                     }
                     .padding(8)
-                    .background(Color.blue.opacity(0.95))
+                    .background {
+                        if #available(iOS 18.0, *) {
+                            GlassBackground(tint: .blue)
+                        } else {
+                            Color.blue.opacity(0.95)
+                        }
+                    }
                 }
                 .transition(.move(edge: .top))
                 .zIndex(2)
