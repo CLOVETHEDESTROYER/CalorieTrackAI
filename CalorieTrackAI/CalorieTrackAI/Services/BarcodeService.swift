@@ -16,27 +16,32 @@ class BarcodeService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        // 1. First check Supabase food database
-        if let foodItem = try await supabaseService.getFoodByBarcode(barcode) {
+        // 1. First check Supabase food database when the user is signed in.
+        if supabaseService.isAuthenticated,
+           let foodItem = try await supabaseService.getFoodByBarcode(barcode) {
             return foodItem
         }
         
         // 2. If not found, try OpenFoodFacts API
         if let foodItem = try await fetchFromOpenFoodFacts(barcode: barcode) {
-            // Save to Supabase for future lookups
-            do {
-                let savedItem = try await supabaseService.addCustomFood(foodItem)
-                return savedItem
-            } catch {
-                // Return the item even if saving fails
-                return foodItem
+            if supabaseService.isAuthenticated {
+                do {
+                    let savedItem = try await supabaseService.addCustomFood(foodItem)
+                    return savedItem
+                } catch {
+                    return foodItem
+                }
             }
+
+            return foodItem
         }
         
-        // 3. If still not found, check mock data for demo purposes
+        #if DEBUG
+        // Keep a small local fallback for simulator demos without polluting TestFlight behavior.
         if let foodItem = getMockFood(barcode: barcode) {
             return foodItem
         }
+        #endif
         
         throw BarcodeServiceError.productNotFound
     }
@@ -105,8 +110,9 @@ class BarcodeService: ObservableObject {
         }
     }
     
-    // MARK: - Mock Data (for demo purposes)
-    
+    #if DEBUG
+    // MARK: - Debug Fallback Data
+
     private func getMockFood(barcode: String) -> FoodItem? {
         let mockFoods: [String: FoodItem] = [
             "1234567890": FoodItem(
@@ -144,9 +150,10 @@ class BarcodeService: ObservableObject {
                 verified: false
             )
         ]
-        
+
         return mockFoods[barcode]
     }
+    #endif
     
     // MARK: - Utility Functions
     
@@ -212,4 +219,4 @@ enum BarcodeServiceError: Error, LocalizedError {
             return "API rate limit reached. Please try again later."
         }
     }
-} 
+}

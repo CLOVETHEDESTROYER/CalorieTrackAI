@@ -40,7 +40,7 @@ struct GlassButton: View {
                 if isLoading {
                     ProgressView()
                         .scaleEffect(loadingScale)
-                        .tint(.white)
+                        .tint(foregroundColor)
                 } else if let icon = icon {
                     Image(systemName: icon)
                         .font(iconFont)
@@ -55,58 +55,31 @@ struct GlassButton: View {
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, verticalPadding)
             .background {
-                if #available(iOS 18.0, *) {
-                    glassBackground
-                } else {
-                    fallbackBackground
-                }
+                buttonBackground
             }
-            .cornerRadius(cornerRadius)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay {
-                if #available(iOS 18.0, *) {
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [
-                                    tint.color.opacity(isDisabled ? 0.1 : 0.4),
-                                    tint.color.opacity(isDisabled ? 0.05 : 0.2)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                } else {
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .stroke(tint.color.opacity(isDisabled ? 0.2 : 0.4), lineWidth: 1)
-                }
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(borderColor, lineWidth: 1)
             }
         }
         .disabled(isDisabled || isLoading)
         .opacity(isDisabled ? 0.6 : 1.0)
     }
     
-    // MARK: - Glass Background (iOS 18+)
-    
-    @available(iOS 18.0, *)
-    private var glassBackground: some View {
-        ZStack {
-            if style == .primary {
-                GlassBackground(tint: tint)
-            } else {
-                GlassCard(tint: tint, intensity: .subtle)
-            }
-            
-            // Enhanced tint for buttons
-            tint.color.opacity(style == .primary ? 0.3 : 0.15)
-                .blendMode(.overlay)
+    @ViewBuilder
+    private var buttonBackground: some View {
+        if style == .primary {
+            tint.color
+        } else {
+            MFTTheme.surface
         }
     }
-    
-    // MARK: - Fallback Background (iOS 17)
-    
-    private var fallbackBackground: some View {
-        tint.color.opacity(style == .primary ? 0.8 : 0.2)
+
+    private var borderColor: Color {
+        style == .primary
+            ? tint.color.opacity(isDisabled ? 0.12 : 0.7)
+            : tint.color.opacity(isDisabled ? 0.1 : 0.3)
     }
     
     // MARK: - Style Properties
@@ -136,11 +109,7 @@ struct GlassButton: View {
     }
     
     private var cornerRadius: CGFloat {
-        switch style {
-        case .primary: return 12
-        case .secondary: return 10
-        case .compact: return 8
-        }
+        8
     }
     
     private var textFont: Font {
@@ -171,11 +140,7 @@ struct GlassButton: View {
         if isDisabled {
             return .secondary
         }
-        if #available(iOS 18.0, *) {
-            return style == .primary ? .white : .primary
-        } else {
-            return style == .primary ? .white : .primary
-        }
+        return style == .primary ? tint.foregroundColor : .primary
     }
     
     private var loadingScale: CGFloat {
@@ -212,12 +177,5 @@ struct GlassButton: View {
         }
     }
     .padding()
-    .background(
-        LinearGradient(
-            colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    )
+    .background(MFTTheme.background)
 }
-

@@ -1,6 +1,6 @@
 # OpenAI Integration Setup Guide
 
-This guide will help you integrate OpenAI's GPT API with your CalTrack AI app for intelligent meal analysis and suggestions.
+This guide will help you integrate OpenAI's GPT API with My Fatness Tracker for meal analysis and suggestions.
 
 ## 🚀 Quick Setup
 
@@ -9,26 +9,40 @@ This guide will help you integrate OpenAI's GPT API with your CalTrack AI app fo
 1. Visit [OpenAI Platform](https://platform.openai.com/api-keys)
 2. Sign in or create an account
 3. Click "Create new secret key"
-4. Give it a name like "CalTrack AI"
+4. Give it a name like "My Fatness Tracker"
 5. Copy your API key (starts with `sk-`)
 
-### 2. Configure Your App
+### 2. Configure Supabase Edge Function for TestFlight
 
-1. Open `Info.plist` in your Xcode project
-2. Find the `OPENAI_API_KEY` entry
-3. Replace `your-openai-api-key-here` with your actual API key
+For TestFlight and production, keep the OpenAI key out of the iOS app. The app calls the authenticated Supabase Edge Function `mft-ai-coach`, and the function reads `OPENAI_API_KEY` from Supabase secrets.
 
-```xml
-<key>OPENAI_API_KEY</key>
-<string>sk-your-actual-api-key-here</string>
+1. In Supabase Dashboard, open **Edge Functions > Secrets**.
+2. Add `OPENAI_API_KEY` with your OpenAI key.
+3. Deploy the `supabase/functions/mft-ai-coach` function with JWT verification enabled.
+
+The function returns the same meal analysis and daily meal plan JSON models that the iOS app already uses.
+
+### 3. Configure the iOS App
+
+Copy the template next to the Xcode project:
+
+```bash
+cp CalorieTrackAI/Config.xcconfig.template Config.xcconfig
 ```
 
-**⚠️ Security Note**: For production apps, use a more secure method to store API keys (like Keychain or environment variables).
+Then add only your Supabase project URL and publishable key. Do not add `OPENAI_API_KEY` to Xcode config; the iOS app no longer reads OpenAI keys from `Info.plist`.
 
-### 3. Test the Integration
+```text
+SUPABASE_URL = https:/$()/your-project-id.supabase.co
+SUPABASE_PUBLISHABLE_KEY = your-supabase-publishable-key-here
+```
+
+**Security note**: Do not paste OpenAI API keys directly into `Info.plist`, Swift files, Markdown docs, or any committed file. Put the OpenAI key only in Supabase Edge Function secrets.
+
+### 4. Test the Integration
 
 1. Build and run your app
-2. Navigate to the "AI Assistant" tab
+2. Navigate to the Log Food flow
 3. Try the meal analysis feature:
    - Enter: "Grilled chicken breast with steamed broccoli and brown rice"
    - Tap "Analyze with AI"
@@ -154,13 +168,7 @@ temperature: 0.3 // Current setting (more consistent)
 
 ### Debug Mode
 
-Enable debug logging by adding this to `OpenAIService.swift`:
-
-```swift
-private func logRequest(_ prompt: String) {
-    print("🤖 OpenAI Request: \(prompt)")
-}
-```
+Debug logs intentionally avoid printing prompts, images, response bodies, or authorization headers. Keep it that way; meal descriptions and food photos are user data.
 
 ## 📈 Analytics & Monitoring
 
@@ -183,13 +191,13 @@ Monitor your OpenAI usage:
 ### Data Handling
 
 - Meal descriptions are sent to OpenAI for processing
-- No personal user information is included in requests
+- Meal descriptions and selected images may be included in requests when the user chooses AI analysis
 - OpenAI's data usage policy applies
 
 ### Security Best Practices
 
 1. **Never commit API keys** to version control
-2. **Use environment variables** in production
+2. **Use local xcconfig files or CI secret injection** for build-time configuration
 3. **Rotate keys regularly**
 4. **Monitor usage** for unusual activity
 
@@ -203,17 +211,11 @@ Monitor your OpenAI usage:
 
 ### Environment Setup
 
-```swift
-// Production configuration
-private init() {
-    #if DEBUG
-    self.apiKey = Bundle.main.object(forInfoDictionaryKey: "OPENAI_API_KEY") as? String ?? ""
-    #else
-    // Use Keychain or secure environment variable
-    self.apiKey = KeychainHelper.getAPIKey() ?? ""
-    #endif
-}
-```
+For TestFlight/Release, prefer the Supabase Edge Function secret:
+
+- `OPENAI_API_KEY` is set in Supabase Edge Function secrets.
+- `mft-ai-coach` is deployed with `verify_jwt = true`.
+- The iOS app includes only `SUPABASE_URL` plus the publishable or legacy anon public key.
 
 ### Error Handling
 
@@ -251,4 +253,4 @@ private var analysisCache: [String: MealAnalysis] = [:]
 
 ---
 
-🎯 **You're Ready!** Your CalTrack AI app now has powerful AI-driven nutrition analysis capabilities. Start tracking smarter with natural language meal descriptions and personalized meal suggestions!
+**You're Ready!** My Fatness Tracker now has AI-driven nutrition analysis, natural language meal descriptions, and personalized meal suggestions.

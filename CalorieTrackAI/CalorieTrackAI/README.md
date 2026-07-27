@@ -1,15 +1,19 @@
-# CalTrack AI
+# My Fatness Tracker
 
-Smart Calorie Tracker with Voice and Vision
+Tough-love calorie, activity, plan, and peptide tracking for iOS.
 
-A modern SwiftUI app that uses MVVM architecture, TabView navigation, **Supabase backend**, and **OpenAI GPT integration** to help users track their nutrition goals with AI-powered features.
+A modern SwiftUI app that uses MVVM architecture, TabView navigation, Supabase, HealthKit, CoreLocation, local notifications, and OpenAI integration to help users track nutrition goals with a deliberately sharp coach voice.
 
 ## Features
 
 - **Dashboard**: View daily progress, calorie consumption, and macronutrient breakdown
+- **Tough-Love Coach**: Configurable accountability copy for food, activity, and plan adherence
 - **Food Logging**: Multiple input methods including manual entry, voice input, barcode scanning, and photo recognition
 - **AI Meal Analysis**: Describe meals in natural language and get instant nutrition estimates
-- **AI Meal Suggestions**: Get personalized daily meal plans based on your goals and preferences
+- **Plan Builder**: Generate meal and workout plans from profile goals
+- **Activity Tracking**: Read steps, workouts, exercise minutes, and active energy from Apple Health
+- **Gym Check-Ins**: Save gym locations and infer visits with geofencing
+- **Peptide / GLP Logbook**: Track user-entered label math and calculate vial concentration/draw volume without medical, sourcing, protocol, or dose recommendations
 - **History**: Browse past food logs with date filtering and meal categorization
 - **Profile Management**: Customize personal information, activity levels, and calorie goals
 - **User Authentication**: Secure email/password authentication with Supabase
@@ -19,15 +23,23 @@ A modern SwiftUI app that uses MVVM architecture, TabView navigation, **Supabase
 ## Project Structure
 
 ```
-CalTrackAI/
-├── CalTrackAIApp.swift          # Main app entry point with Supabase integration
-├── ContentView.swift            # Main TabView navigation (includes AI Assistant tab)
+CalorieTrackAI/
+├── MyFatnessTrackerApp.swift    # Main app entry point with Supabase and notification startup
+├── ContentView.swift            # Main TabView navigation
 ├── Info.plist                   # App configuration and permissions
+├── PrivacyInfo.xcprivacy        # App privacy manifest
 ├── supabase_setup.sql           # Database schema for Supabase
+├── supabase_my_fatness_tracker_features.sql # Feature tables for coach, activity, plans, gyms, and peptides
+├── TESTFLIGHT_CHECKLIST.md      # Archive, backend, and real-device verification checklist
+├── APP_REVIEW_NOTES.md          # Copy for App Store Connect review notes
 ├── SUPABASE_SETUP.md           # Complete Supabase setup guide
 ├── OPENAI_SETUP.md             # Complete OpenAI integration guide
 │
 ├── Models/
+│   ├── ActivityModels.swift     # HealthKit and gym check-in models
+│   ├── CoachModels.swift        # Coach tone and message models
+│   ├── FitnessPlanModels.swift  # Meal and workout plan models
+│   ├── PeptideModels.swift      # Calculator/logbook models
 │   ├── Food.swift               # Legacy food data model
 │   ├── User.swift               # Legacy user profile model
 │   └── MealEntry.swift          # Enhanced meal entry model for Supabase
@@ -35,6 +47,9 @@ CalTrackAI/
 ├── Views/
 │   ├── DashboardView.swift      # Main dashboard
 │   ├── LogFoodView.swift        # Food logging interface with AI Quick Analysis
+│   ├── ActivityCoachView.swift  # Steps, workout, and gym accountability
+│   ├── PlanBuilderView.swift    # Meal and workout plan builder
+│   ├── PeptideTrackerView.swift # Peptide / GLP label-math logbook
 │   ├── AIFoodAnalysisView.swift # Dedicated AI meal analysis and suggestions
 │   ├── HistoryView.swift        # Food history browser
 │   ├── ProfileView.swift        # User profile management
@@ -48,6 +63,7 @@ CalTrackAI/
 │   │
 │   └── Supporting/
 │       ├── BarcodeScannerView.swift    # Barcode scanning interface
+│       ├── CoachSettingsView.swift     # Coach tone controls
 │       ├── EditProfileView.swift      # Profile editing form
 │       └── NotificationSettingsView.swift # Settings screens
 │
@@ -60,6 +76,12 @@ CalTrackAI/
 └── Services/
     ├── SupabaseService.swift       # Main Supabase integration
     ├── OpenAIService.swift         # OpenAI GPT API integration
+    ├── CoachMessageService.swift   # Tough-love coach messaging
+    ├── CoachNotificationService.swift # Local coach reminders
+    ├── FitnessPlanService.swift    # Plan generation and sync
+    ├── GymLocationService.swift    # Saved gyms and geofences
+    ├── HealthKitService.swift      # Apple Health reads
+    ├── PeptideLogStore.swift       # Peptide log persistence
     ├── FoodService.swift           # Food data with Supabase backend
     ├── UserService.swift           # User data with Supabase backend
     ├── VoiceService.swift          # Speech recognition
@@ -148,14 +170,14 @@ This app follows the **MVVM (Model-View-ViewModel)** pattern with **Supabase bac
 
    ```bash
    git clone <repository>
-   cd CalTrackAI
+   cd CalorieTrackAI/CalorieTrackAI
    ```
 
 2. **Configure API Keys (Secure Method)**
 
    ```bash
    # Copy the configuration template
-   cp Config.xcconfig.template Config.xcconfig
+   cp CalorieTrackAI/Config.xcconfig.template Config.xcconfig
 
    # Edit Config.xcconfig with your actual API keys
    # - OpenAI: https://platform.openai.com/api-keys
@@ -166,6 +188,7 @@ This app follows the **MVVM (Model-View-ViewModel)** pattern with **Supabase bac
 
    - Create Supabase project
    - Run SQL schema from `supabase_setup.sql`
+   - Run feature schema from `supabase_my_fatness_tracker_features.sql`
    - Verify tables created
 
 4. **Build and Test**
@@ -182,7 +205,7 @@ This app follows the **MVVM (Model-View-ViewModel)** pattern with **Supabase bac
 - **Barcode Scanning**: Instant food lookup with OpenFoodFacts API
 - **Voice Input**: "I ate a banana for breakfast"
 - **Manual Entry**: Complete nutrition information
-- **Photo Recognition**: AI-powered food identification (coming soon)
+- **Photo Recognition**: AI-powered food photo analysis with prefill and one-tap logging
 
 ### 📈 Analytics
 
@@ -217,11 +240,10 @@ This app follows the **MVVM (Model-View-ViewModel)** pattern with **Supabase bac
 ## Future Enhancements
 
 - **Core ML Integration**: On-device food image recognition
-- **HealthKit Sync**: Integration with Apple Health
-- **Apple Watch App**: Quick food logging from wrist
+- **Apple Watch App**: Quick food logging and coach check-ins from wrist
 - **Social Features**: Share progress and challenges with friends
 - **Advanced Analytics**: Detailed nutrition insights and recommendations
-- **Push Notifications**: Meal reminders and goal celebrations
+- **Push Notifications**: Remote notification support beyond current local coach reminders
 
 ## Contributing
 
@@ -240,4 +262,4 @@ This app follows the **MVVM (Model-View-ViewModel)** pattern with **Supabase bac
 
 ---
 
-🎉 **Ready to track your nutrition journey with AI?** Follow the setup guide and start logging your meals today!
+Follow the setup guide and TestFlight checklist before archiving.

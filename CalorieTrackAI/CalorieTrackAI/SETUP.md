@@ -1,6 +1,6 @@
-# CalTrack AI Setup Guide
+# My Fatness Tracker Setup Guide
 
-Complete setup instructions for CalTrack AI with secure API key management.
+Complete setup instructions for My Fatness Tracker with secure API key management.
 
 ## 🚀 Quick Start
 
@@ -10,12 +10,12 @@ Complete setup instructions for CalTrack AI with secure API key management.
 
    ```bash
    git clone <your-repo-url>
-   cd CalTrackAI
+   cd CalorieTrackAI/CalorieTrackAI
    ```
 
 2. **Open in Xcode**
    ```bash
-   open CalTrackAI.xcodeproj
+   open CalorieTrackAI.xcodeproj
    ```
 
 ### 2. Configure API Keys (Required)
@@ -23,8 +23,8 @@ Complete setup instructions for CalTrack AI with secure API key management.
 #### Step 1: Create Configuration File
 
 ```bash
-# In the project root directory
-cp Config.xcconfig.template Config.xcconfig
+# From the folder that contains CalorieTrackAI.xcodeproj
+cp CalorieTrackAI/Config.xcconfig.template Config.xcconfig
 ```
 
 #### Step 2: Get Your API Keys
@@ -34,7 +34,7 @@ cp Config.xcconfig.template Config.xcconfig
 1. Visit [OpenAI Platform](https://platform.openai.com/api-keys)
 2. Sign in or create an account
 3. Click "Create new secret key"
-4. Name it "CalTrack AI"
+4. Name it "My Fatness Tracker"
 5. Copy the key (starts with `sk-`)
 
 **Supabase Credentials:**
@@ -42,18 +42,24 @@ cp Config.xcconfig.template Config.xcconfig
 1. Visit [Supabase Dashboard](https://supabase.com/dashboard)
 2. Create a new project or select existing
 3. Go to Settings → API
-4. Copy your Project URL and anon public key
+4. Copy your Project URL and anon public key or publishable key
+
+Never use the database password, JWT secret, personal access token, or service role key in the iOS app.
 
 #### Step 3: Update Configuration
 
 Edit `Config.xcconfig` with your actual keys:
 
 ```bash
-// CalTrack AI Configuration
-OPENAI_API_KEY = sk-proj-your-actual-openai-key-here
-SUPABASE_URL = https://your-project-id.supabase.co
+// My Fatness Tracker Configuration
+SUPABASE_URL = https:/$()/your-project-id.supabase.co
+SUPABASE_PUBLISHABLE_KEY = your-supabase-publishable-key-here
 SUPABASE_ANON_KEY = your-supabase-anon-key-here
 ```
+
+Use `SUPABASE_PUBLISHABLE_KEY` for Supabase's newer `sb_publishable_...` keys. Use `SUPABASE_ANON_KEY` only if your dashboard shows legacy anon keys. In `.xcconfig`, write Supabase URLs as `https:/$()/your-project-id.supabase.co` so Xcode does not treat `//` as a comment.
+
+Put the real OpenAI key in Supabase **Edge Functions > Secrets** as `OPENAI_API_KEY` and deploy `mft-ai-coach` with JWT verification enabled. Do not put OpenAI keys in the iOS app bundle.
 
 ### 3. Database Setup
 
@@ -61,12 +67,13 @@ SUPABASE_ANON_KEY = your-supabase-anon-key-here
 
    - Open Supabase dashboard
    - Go to SQL Editor
-   - Copy contents from `supabase_setup.sql`
+   - Copy contents from `supabase_fresh_start.sql`
    - Execute the SQL
 
 2. **Verify Tables Created**
    - Check Table Editor in Supabase
-   - Should see: `food_database`, `user_profiles`, `meal_entries`
+   - Should see base tables: `food_database`, `user_profiles`, `meal_entries`
+   - Should see feature tables: `coach_user_settings`, `fitness_plans`, `activity_daily_summaries`, `gym_locations`, `gym_visits`, `peptide_logs`
 
 ### 4. Build and Test
 
@@ -98,7 +105,7 @@ Config.xcconfig          # Your actual API keys (gitignored)
 ### What's Safe to Commit
 
 ```
-Config.xcconfig.template # Template with instructions
+CalorieTrackAI/Config.xcconfig.template # Template with instructions
 Info.plist              # Uses variables, no actual keys
 .gitignore              # Protects sensitive files
 ```
@@ -108,13 +115,18 @@ Info.plist              # Uses variables, no actual keys
 ### Configuration Files
 
 ```
-CalTrackAI/
-├── Config.xcconfig.template    # Template (safe to commit)
+CalorieTrackAI/
+├── CalorieTrackAI.xcodeproj
 ├── Config.xcconfig            # Your keys (DO NOT COMMIT)
-├── Info.plist                 # Uses $(VARIABLES)
-├── .gitignore                 # Protects sensitive files
-└── SETUP.md                   # This guide
+├── CalorieTrackAI/
+│   ├── Config.xcconfig.template # Template (safe to commit)
+│   ├── Info.plist              # Uses $(VARIABLES)
+│   ├── PrivacyInfo.xcprivacy   # App privacy manifest
+│   ├── TESTFLIGHT_CHECKLIST.md # Archive and release readiness checklist
+│   └── SETUP.md                # This guide
 ```
+
+The local config lives beside `CalorieTrackAI.xcodeproj` because the Xcode project's base configuration points to `Config.xcconfig` from that folder.
 
 ### Core Architecture
 
@@ -125,6 +137,12 @@ CalTrackAI/
 └── Services/                 # API integrations
     ├── SupabaseService.swift # Database & auth
     ├── OpenAIService.swift   # AI features
+    ├── HealthKitService.swift # Apple Health activity reads
+    ├── GymLocationService.swift # Gym geofences and visits
+    ├── FitnessPlanService.swift # Meal/workout plans
+    ├── CoachMessageService.swift # Tough-love coach messages
+    ├── CoachNotificationService.swift # Local reminders
+    ├── PeptideLogStore.swift # Peptide logbook storage
     ├── FoodService.swift     # Food data
     └── BarcodeService.swift  # Food lookup
 ```
@@ -138,15 +156,15 @@ For different environments, create separate config files:
 **Config-Debug.xcconfig** (Development):
 
 ```bash
-OPENAI_API_KEY = sk-your-dev-key
-SUPABASE_URL = https://dev-project.supabase.co
+SUPABASE_URL = https:/$()/dev-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY = your-dev-publishable-key
 ```
 
 **Config-Release.xcconfig** (Production):
 
 ```bash
-OPENAI_API_KEY = sk-your-prod-key
-SUPABASE_URL = https://prod-project.supabase.co
+SUPABASE_URL = https:/$()/prod-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY = your-prod-publishable-key
 ```
 
 ### Team Setup
@@ -169,6 +187,16 @@ SUPABASE_URL = https://prod-project.supabase.co
 1. Ensure `Config.xcconfig` exists
 2. Check Supabase URL and key are correct
 3. Verify no typos in variable names
+
+### Password Reset Link Does Not Open the App
+
+In Supabase Dashboard, go to **Authentication** → **URL Configuration** and add:
+
+```text
+myfatnesstracker://auth-callback
+```
+
+The app registers this URL scheme in `Info.plist` and uses it for Supabase password recovery callbacks.
 
 ### "OpenAI API key not configured" Warning
 
@@ -215,11 +243,12 @@ AI features will be disabled until configured.
 ### What to Commit
 
 ```bash
-git add Config.xcconfig.template
+git add CalorieTrackAI/Config.xcconfig.template
 git add .gitignore
-git add SETUP.md
-git add "*.swift"
-git add Info.plist
+git add CalorieTrackAI/SETUP.md
+git add CalorieTrackAI/TESTFLIGHT_CHECKLIST.md
+git add "CalorieTrackAI/*.swift" "CalorieTrackAI/Models/*.swift" "CalorieTrackAI/Services/*.swift" "CalorieTrackAI/Views/**/*.swift"
+git add CalorieTrackAI/Info.plist CalorieTrackAI/PrivacyInfo.xcprivacy
 ```
 
 ### What NOT to Commit
@@ -252,11 +281,13 @@ Before starting development:
 
 - [ ] `Config.xcconfig` created and configured
 - [ ] Supabase database schema deployed
+- [ ] Supabase feature schema deployed
 - [ ] App builds without errors
 - [ ] Authentication works
 - [ ] AI analysis responds correctly
 - [ ] Food logging saves to database
+- [ ] Coach settings, plans, activity summaries, gym visits, and peptide logs save after login
 
 ---
 
-🎉 **You're ready to start developing!** Your CalTrack AI app is now securely configured with all necessary API integrations.
+Your app is now securely configured with the required API integrations.

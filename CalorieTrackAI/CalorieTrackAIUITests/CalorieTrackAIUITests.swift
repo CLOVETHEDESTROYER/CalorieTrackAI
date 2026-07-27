@@ -23,12 +23,20 @@ final class CalorieTrackAIUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testManualFoodNameFieldAcceptsTextInTestingMode() throws {
         let app = XCUIApplication()
+        app.launchEnvironment["MFT_UNLOCK_FEATURES_FOR_TESTING"] = "1"
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        app.tabBars.buttons["Log"].tap()
+
+        let foodNameField = app.textFields["glass-text-field-Food name"]
+        XCTAssertTrue(foodNameField.waitForExistence(timeout: 5), "Food name field should be visible on the Log tab.")
+
+        foodNameField.tap()
+        foodNameField.typeText("Greek yogurt")
+
+        XCTAssertEqual(foodNameField.value as? String, "Greek yogurt")
     }
 
     @MainActor
@@ -38,6 +46,36 @@ final class CalorieTrackAIUITests: XCTestCase {
             measure(metrics: [XCTApplicationLaunchMetric()]) {
                 XCUIApplication().launch()
             }
+        }
+    }
+
+    @MainActor
+    func testMovementChallengeMannequinCards() throws {
+        let challenges = [
+            ("push_up", "Push-Up Test"),
+            ("squat", "Squat Test"),
+            ("jumping_jack", "Jumping Jacks"),
+            ("plank", "Plank Hold")
+        ]
+
+        for (rawValue, title) in challenges {
+            let app = XCUIApplication()
+            app.launchEnvironment["MFT_UNLOCK_FEATURES_FOR_TESTING"] = "1"
+            app.launchEnvironment["MFT_INITIAL_CHALLENGE_FOR_TESTING"] = rawValue
+            app.launch()
+
+            let titleLabel = app.staticTexts[title]
+            XCTAssertTrue(
+                titleLabel.waitForExistence(timeout: 5),
+                "\(title) should be visible in the challenge pager."
+            )
+
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = title.replacingOccurrences(of: " ", with: "-")
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+
+            app.terminate()
         }
     }
 }

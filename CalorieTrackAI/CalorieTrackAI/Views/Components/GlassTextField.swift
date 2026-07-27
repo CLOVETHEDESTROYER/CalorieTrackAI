@@ -40,59 +40,28 @@ struct GlassTextField: View {
                 SecureField(placeholder, text: $text)
                     .textFieldStyle(PlainTextFieldStyle())
                     .disabled(isDisabled)
+                    .accessibilityIdentifier("glass-text-field-\(placeholder)")
             } else {
                 TextField(placeholder, text: $text)
                     .textFieldStyle(PlainTextFieldStyle())
                     .keyboardType(keyboardType)
                     .disabled(isDisabled)
+                    .accessibilityIdentifier("glass-text-field-\(placeholder)")
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background {
-            if #available(iOS 18.0, *) {
-                glassBackground
-            } else {
-                fallbackBackground
-            }
-        }
-        .cornerRadius(12)
+        .background(MFTTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
-            if #available(iOS 18.0, *) {
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                tint.color.opacity(0.3),
-                                tint.color.opacity(0.1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(tint.color.opacity(0.3), lineWidth: 1)
-            }
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(tint.color.opacity(0.28), lineWidth: 1)
+                    .allowsHitTesting(false)
         }
         .opacity(isDisabled ? 0.6 : 1.0)
+        .accessibilityIdentifier("glass-text-field-\(placeholder)")
     }
     
-    @available(iOS 18.0, *)
-    private var glassBackground: some View {
-        ZStack {
-            GlassCard(tint: tint, intensity: .subtle)
-            
-            // Subtle tint
-            tint.color.opacity(0.05)
-                .blendMode(.overlay)
-        }
-    }
-    
-    private var fallbackBackground: some View {
-        tint.color.opacity(0.08)
-    }
 }
 
 /// A numeric text field with glass morphism effect for Double values
@@ -129,53 +98,21 @@ struct GlassNumberField: View {
                 .textFieldStyle(PlainTextFieldStyle())
                 .keyboardType(.decimalPad)
                 .disabled(isDisabled)
+                .accessibilityIdentifier("glass-number-field-\(placeholder)")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background {
-            if #available(iOS 18.0, *) {
-                glassBackground
-            } else {
-                fallbackBackground
-            }
-        }
-        .cornerRadius(12)
+        .background(MFTTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
-            if #available(iOS 18.0, *) {
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                tint.color.opacity(0.3),
-                                tint.color.opacity(0.1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(tint.color.opacity(0.3), lineWidth: 1)
-            }
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(tint.color.opacity(0.28), lineWidth: 1)
+                    .allowsHitTesting(false)
         }
         .opacity(isDisabled ? 0.6 : 1.0)
+        .accessibilityIdentifier("glass-number-field-\(placeholder)")
     }
     
-    @available(iOS 18.0, *)
-    private var glassBackground: some View {
-        ZStack {
-            GlassCard(tint: tint, intensity: .subtle)
-            
-            // Subtle tint
-            tint.color.opacity(0.05)
-                .blendMode(.overlay)
-        }
-    }
-    
-    private var fallbackBackground: some View {
-        tint.color.opacity(0.08)
-    }
 }
 
 /// A multi-line text editor with glass morphism effect
@@ -207,59 +144,28 @@ struct GlassTextEditor: View {
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 16)
+                    .allowsHitTesting(false)
             }
-            
+
             TextEditor(text: $text)
                 .scrollContentBackground(.hidden)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .disabled(isDisabled)
+                .accessibilityIdentifier("glass-text-editor-\(placeholder)")
         }
         .frame(minHeight: minHeight)
-        .background {
-            if #available(iOS 18.0, *) {
-                glassBackground
-            } else {
-                fallbackBackground
-            }
-        }
-        .cornerRadius(12)
+        .background(MFTTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay {
-            if #available(iOS 18.0, *) {
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                tint.color.opacity(0.3),
-                                tint.color.opacity(0.1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(tint.color.opacity(0.3), lineWidth: 1)
-            }
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(tint.color.opacity(0.28), lineWidth: 1)
+                    .allowsHitTesting(false)
         }
         .opacity(isDisabled ? 0.6 : 1.0)
+        .accessibilityIdentifier("glass-text-editor-\(placeholder)")
     }
     
-    @available(iOS 18.0, *)
-    private var glassBackground: some View {
-        ZStack {
-            GlassCard(tint: tint, intensity: .subtle)
-            
-            // Subtle tint
-            tint.color.opacity(0.05)
-                .blendMode(.overlay)
-        }
-    }
-    
-    private var fallbackBackground: some View {
-        tint.color.opacity(0.08)
-    }
 }
 
 // MARK: - Preview
@@ -296,12 +202,5 @@ struct GlassTextEditor: View {
         )
     }
     .padding()
-    .background(
-        LinearGradient(
-            colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    )
+    .background(MFTTheme.background)
 }
-

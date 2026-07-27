@@ -25,26 +25,14 @@ class HistoryViewModel: ObservableObject {
         foods.reduce(0) { $0 + $1.fat }
     }
     
-    var groupedFoods: [String: [Food]] {
-        let calendar = Calendar.current
-        
-        return Dictionary(grouping: foods) { food in
-            let hour = calendar.component(.hour, from: food.dateLogged)
-            
-            switch hour {
-            case 5..<12:
-                return "Breakfast"
-            case 12..<17:
-                return "Lunch"
-            case 17..<21:
-                return "Dinner"
-            default:
-                return "Snacks"
-            }
+    var groupedFoods: [MealEntry.MealType: [Food]] {
+        Dictionary(grouping: foods) { food in
+            food.mealType ?? MealTimeClassifier.mealType(for: food.dateLogged)
         }
     }
     
     func loadFoodsForDate(_ date: Date) async {
+        selectedDate = date
         isLoading = true
         defer { isLoading = false }
         
@@ -77,4 +65,4 @@ class HistoryViewModel: ObservableObject {
     func loadInitialData() async {
         await loadFoodsForDate(selectedDate)
     }
-} 
+}

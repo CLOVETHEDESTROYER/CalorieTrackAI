@@ -1,0 +1,21 @@
+.DS_Store
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+
+# Local build output
+DerivedData/
+build/
+*.xcresult
+
+# Local API/build configuration
+Config.xcconfig
+*.xcconfig
+!Config.xcconfig.template
+
+# Local Supabase exports/backups
+*.backup
+*.backup.gz
+*.storage.zip
+*.dump

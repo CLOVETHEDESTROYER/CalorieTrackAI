@@ -9,7 +9,8 @@ This project implements enterprise-grade security practices for API key manageme
 ### Protected Files (Never Committed)
 
 ```
-Config.xcconfig                 # Contains actual API keys (gitignored)
+Config.xcconfig                 # Contains public app configuration only (gitignored)
+Supabase Edge Function secrets  # Contains OPENAI_API_KEY outside the iOS app
 ```
 
 ### Safe Files (Committed to Git)
@@ -17,7 +18,7 @@ Config.xcconfig                 # Contains actual API keys (gitignored)
 ```
 Config.xcconfig.template        # Template with setup instructions
 .gitignore                     # Comprehensive protection rules
-Info.plist                     # Uses variables: $(OPENAI_API_KEY)
+Info.plist                     # Uses Supabase public configuration variables only
 SETUP.md                       # Detailed setup guide
 ```
 
@@ -26,8 +27,9 @@ SETUP.md                       # Detailed setup guide
 ### 1. Configuration Separation
 
 - **Template File**: `Config.xcconfig.template` with instructions (committed)
-- **Actual Config**: `Config.xcconfig` with real keys (gitignored)
-- **Info.plist**: Uses Xcode variables instead of hardcoded values
+- **Actual Config**: `Config.xcconfig` with Supabase URL and publishable/anon public key (gitignored)
+- **OpenAI Secret**: `OPENAI_API_KEY` lives in Supabase Edge Function secrets, never in the iOS app bundle
+- **Info.plist**: Uses Xcode variables for public Supabase configuration only
 
 ### 2. Runtime Validation
 
@@ -35,13 +37,18 @@ SETUP.md                       # Detailed setup guide
 // SupabaseService.swift
 guard let supabaseURL = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
       !supabaseURL.isEmpty && supabaseURL != "your-supabase-url-here" else {
-    fatalError("⚠️ Supabase configuration missing!")
+    // Start in guest mode so the app can still launch while local config is missing.
+    self.client = SupabaseClient(
+        supabaseURL: URL(string: "https://placeholder.supabase.co")!,
+        supabaseKey: "placeholder"
+    )
+    self.isGuestMode = true
+    return
 }
 
 // OpenAIService.swift
-if configuredKey.isEmpty || configuredKey == "your-openai-api-key-here" {
-    print("⚠️ OpenAI API key not configured! AI features disabled.")
-}
+// User-facing AI calls go through the authenticated mft-ai-coach Supabase Edge Function.
+// The OpenAI key is read by the Edge Function from Supabase secrets.
 ```
 
 ### 3. Comprehensive .gitignore
@@ -60,20 +67,21 @@ if configuredKey.isEmpty || configuredKey == "your-openai-api-key-here" {
 
 ## 🔧 How It Works
 
-### Build-Time Configuration
+### Runtime Configuration
 
 1. **Xcode reads** `Config.xcconfig` during build
-2. **Variables** (e.g., `$(OPENAI_API_KEY)`) are substituted in `Info.plist`
-3. **App Bundle** contains resolved values (not variables)
-4. **Services** read values from `Bundle.main.object(forInfoDictionaryKey:)`
+2. **Supabase variables** are substituted in `Info.plist`
+3. **App Bundle** contains the Supabase public URL and publishable/anon key only
+4. **AI requests** are sent to `mft-ai-coach`, which reads `OPENAI_API_KEY` from Supabase secrets
 
 ### Development Workflow
 
 1. **Developer clones** repo (no sensitive data)
-2. **Copies template**: `cp Config.xcconfig.template Config.xcconfig`
-3. **Adds real keys** to `Config.xcconfig`
-4. **Builds and runs** with full functionality
-5. **Git ignores** `Config.xcconfig` automatically
+2. **Copies template**: `cp CalorieTrackAI/Config.xcconfig.template Config.xcconfig`
+3. **Adds Supabase public configuration** to `Config.xcconfig`
+4. **Adds OpenAI key** to Supabase Edge Function secrets
+5. **Builds and runs** with full functionality after sign-in
+6. **Git ignores** `Config.xcconfig` automatically
 
 ## ✅ Security Benefits
 
@@ -82,7 +90,7 @@ if configuredKey.isEmpty || configuredKey == "your-openai-api-key-here" {
 - ❌ **No hardcoded secrets** in source code
 - ❌ **No API keys in Git history**
 - ❌ **No accidental commits** of sensitive data
-- ❌ **No keys in Info.plist** (uses variables)
+- ❌ **No OpenAI keys in Info.plist or app bundle**
 
 ### Enables Secure Practices
 
@@ -96,7 +104,7 @@ if configuredKey.isEmpty || configuredKey == "your-openai-api-key-here" {
 ### Never Committed to Git
 
 ```bash
-Config.xcconfig              # Your actual API keys
+Config.xcconfig              # Local public app config
 *.xcconfig                   # All config files
 .env                        # Environment variables
 secrets.plist               # Any secrets file
@@ -107,7 +115,7 @@ GoogleService-Info.plist    # Firebase configs (if added)
 
 ```bash
 Config.xcconfig.template    # Setup instructions
-Info.plist                 # Uses $(VARIABLES)
+Info.plist                 # Uses Supabase public variables only
 SETUP.md                   # Setup guide
 .gitignore                 # Protection rules
 Services/*.swift           # Code (no hardcoded secrets)
@@ -120,21 +128,18 @@ Services/*.swift           # Code (no hardcoded secrets)
 1. Clone repository
 2. Follow `SETUP.md` instructions
 3. Create personal `Config.xcconfig`
-4. Get API keys from team lead
-5. Start developing immediately
+4. Get Supabase public config from team lead
+5. Confirm `mft-ai-coach` has `OPENAI_API_KEY` set in Supabase secrets
+6. Start developing immediately
 
 ### For CI/CD Pipelines
 
 ```bash
-# Can inject keys as environment variables
-export OPENAI_API_KEY="sk-..."
+# Can inject public app config as environment variables
 export SUPABASE_URL="https://..."
-export SUPABASE_ANON_KEY="..."
+export SUPABASE_PUBLISHABLE_KEY="sb_publishable_..."
 
-# Or use secure CI/CD secret management
-# - GitHub Secrets
-# - Xcode Cloud environment variables
-# - Jenkins credentials
+# Keep OPENAI_API_KEY in Supabase Edge Function secrets, not the iOS build.
 ```
 
 ## 📋 Security Checklist
@@ -142,10 +147,11 @@ export SUPABASE_ANON_KEY="..."
 Before committing code:
 
 - [ ] No API keys in any committed files
+- [ ] No OpenAI key in app `Info.plist` or archived app bundle
 - [ ] `Config.xcconfig` is gitignored
 - [ ] Template file is up to date
 - [ ] Runtime validation provides helpful errors
-- [ ] Info.plist uses variables, not literal values
+- [ ] Info.plist uses Supabase public variables only
 
 ## 🎯 Best Practices Implemented
 
@@ -159,9 +165,9 @@ Before committing code:
 
 This configuration approach scales from development to production:
 
-- **Development**: Personal API keys in local `Config.xcconfig`
-- **CI/CD**: Injected via environment variables or secret management
-- **Production**: Separate production keys, secure deployment
+- **Development**: Supabase public config in local `Config.xcconfig`
+- **AI Secrets**: OpenAI key in Supabase Edge Function secrets
+- **Production**: Separate production Supabase project and Edge Function secret
 - **Team**: Each developer has isolated configuration
 
 The app is now ready for secure development and deployment! 🎉

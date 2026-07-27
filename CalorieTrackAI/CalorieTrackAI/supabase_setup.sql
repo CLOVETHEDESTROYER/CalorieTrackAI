@@ -1,4 +1,4 @@
--- CalTrack AI Supabase Database Schema
+-- My Fatness Tracker Supabase Database Schema
 -- Run this SQL in your Supabase SQL Editor to set up the database
 
 -- Enable UUID extension
@@ -215,4 +215,4 @@ BEGIN
         CASE WHEN f.verified THEN 0 ELSE 1 END,
         f.name;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER; 
+$$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -7,17 +7,18 @@ struct HistoryView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Prominent glass background for iOS 18+
-                if #available(iOS 18.0, *) {
-                    LinearGradient(
-                        colors: [.orange.opacity(0.15), .blue.opacity(0.1), .green.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+                MFTTheme.background
                     .ignoresSafeArea()
-                }
                 
             VStack(spacing: 0) {
+                MFTPageHeader(
+                    kicker: "Nutrition record",
+                    title: "History.",
+                    subtitle: "A clean daily receipt of what you logged."
+                )
+                .padding(.horizontal)
+                .padding(.top, 12)
+
                 // Date Picker
                 DatePicker("Select Date", selection: $selectedDate, displayedComponents: .date)
                     .datePickerStyle(CompactDatePickerStyle())
@@ -95,10 +96,12 @@ struct HistoryView: View {
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                         } else {
-                            ForEach(viewModel.groupedFoods.keys.sorted(), id: \.self) { mealTime in
-                                Section(mealTime) {
-                                    ForEach(viewModel.groupedFoods[mealTime] ?? []) { food in
-                                        FoodRowView(food: food)
+                            ForEach(MealEntry.MealType.allCases, id: \.self) { mealType in
+                                let foods = viewModel.groupedFoods[mealType] ?? []
+                                if !foods.isEmpty {
+                                    Section(mealType.displayName) {
+                                        ForEach(foods) { food in
+                                            FoodRowView(food: food)
                                             .swipeActions(edge: .trailing) {
                                                 Button("Delete", role: .destructive) {
                                                     Task {
@@ -106,6 +109,7 @@ struct HistoryView: View {
                                                     }
                                                 }
                                             }
+                                        }
                                     }
                                 }
                             }
@@ -116,7 +120,10 @@ struct HistoryView: View {
                 }
             }
             }
-            .navigationTitle("History")
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .tint(MFTTheme.accent)
+            .mftPageChrome()
             .task {
                 await viewModel.loadInitialData()
             }
@@ -147,4 +154,4 @@ struct MacroCircle: View {
                 .foregroundColor(.secondary)
         }
     }
-} 
+}

@@ -11,7 +11,7 @@ class FoodService: ObservableObject {
     
     // MARK: - Food Operations (Updated for Supabase)
     
-    func addFood(_ food: Food) async throws {
+    func addFood(_ food: Food, mealType: MealEntry.MealType? = nil) async throws {
         guard supabaseService.isAuthenticated else {
             throw FoodServiceError.notAuthenticated
         }
@@ -19,13 +19,11 @@ class FoodService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        // Determine meal type based on current time
-        let mealType = determineMealType()
-        
         // Convert Food to MealEntry for Supabase
-        let mealEntry = MealEntry.from(food: food, mealType: mealType)
+        let mealEntry = MealEntry.from(food: food, mealType: mealType ?? determineMealType(for: food.dateLogged))
         
         _ = try await supabaseService.saveMealEntry(mealEntry)
+        scheduleNotificationRefresh()
     }
     
     func addMealEntry(_ entry: MealEntry) async throws -> MealEntry {
@@ -36,7 +34,9 @@ class FoodService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        return try await supabaseService.saveMealEntry(entry)
+        let savedEntry = try await supabaseService.saveMealEntry(entry)
+        scheduleNotificationRefresh()
+        return savedEntry
     }
     
     func getFoodsForDate(_ date: Date) async throws -> [Food] {
@@ -71,6 +71,7 @@ class FoodService: ObservableObject {
         defer { isLoading = false }
         
         try await supabaseService.deleteMealEntry(food.id)
+        scheduleNotificationRefresh()
     }
     
     func deleteMealEntry(_ entry: MealEntry) async throws {
@@ -82,6 +83,7 @@ class FoodService: ObservableObject {
         defer { isLoading = false }
         
         try await supabaseService.deleteMealEntry(entry.id)
+        scheduleNotificationRefresh()
     }
     
     func updateMealEntry(_ entry: MealEntry) async throws -> MealEntry {
@@ -92,7 +94,9 @@ class FoodService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        return try await supabaseService.updateMealEntry(entry)
+        let updatedEntry = try await supabaseService.updateMealEntry(entry)
+        scheduleNotificationRefresh()
+        return updatedEntry
     }
     
     // MARK: - Food Database Search
@@ -147,9 +151,11 @@ class FoodService: ObservableObject {
     private let userDefaults = UserDefaults.standard
     private let foodsKey = "SavedFoods"
     
-    func addFoodOffline(_ food: Food) {
+    func addFoodOffline(_ food: Food, mealType: MealEntry.MealType? = nil) {
         var foods = getAllFoodsOffline()
-        foods.append(food)
+        var foodToSave = food
+        foodToSave.mealType = mealType ?? food.mealType ?? determineMealType(for: food.dateLogged)
+        foods.append(foodToSave)
         saveFoodsOffline(foods)
     }
     
@@ -167,6 +173,19 @@ class FoodService: ObservableObject {
             calendar.isDate(food.dateLogged, inSameDayAs: date)
         }.sorted { $0.dateLogged < $1.dateLogged }
     }
+
+    func getFoodsForDateRangeOffline(from startDate: Date, to endDate: Date) -> [Food] {
+        getAllFoodsOffline()
+            .filter { $0.dateLogged >= startDate && $0.dateLogged <= endDate }
+            .sorted { $0.dateLogged < $1.dateLogged }
+    }
+
+    func updateFoodOffline(_ food: Food) {
+        var foods = getAllFoodsOffline()
+        guard let index = foods.firstIndex(where: { $0.id == food.id }) else { return }
+        foods[index] = food
+        saveFoodsOffline(foods)
+    }
     
     func deleteFoodOffline(_ food: Food) {
         var foods = getAllFoodsOffline()
@@ -176,6 +195,7 @@ class FoodService: ObservableObject {
     
     func deleteAllFoodsOffline() {
         userDefaults.removeObject(forKey: foodsKey)
+        scheduleNotificationRefresh()
     }
     
     func getTotalFoodsLoggedOffline() -> Int {
@@ -185,6 +205,7 @@ class FoodService: ObservableObject {
     private func saveFoodsOffline(_ foods: [Food]) {
         if let data = try? JSONEncoder().encode(foods) {
             userDefaults.set(data, forKey: foodsKey)
+            scheduleNotificationRefresh()
         }
     }
     
@@ -197,7 +218,7 @@ class FoodService: ObservableObject {
         
         for food in offlineFoods {
             do {
-                try await addFood(food)
+                try await addFood(food, mealType: food.mealType)
             } catch {
                 #if DEBUG
                 print("Failed to sync food: \(food.name), error: \(error)")
@@ -211,19 +232,8 @@ class FoodService: ObservableObject {
     
     // MARK: - Helper Functions
     
-    private func determineMealType() -> MealEntry.MealType {
-        let hour = Calendar.current.component(.hour, from: Date())
-        
-        switch hour {
-        case 5..<12:
-            return .breakfast
-        case 12..<17:
-            return .lunch
-        case 17..<21:
-            return .dinner
-        default:
-            return .snack
-        }
+    private func determineMealType(for date: Date = Date()) -> MealEntry.MealType {
+        MealTimeClassifier.mealType(for: date)
     }
     
     // MARK: - Legacy Support (for existing ViewModels)
@@ -262,13 +272,27 @@ class FoodService: ObservableObject {
     }
     
     func deleteAllFoods() async throws {
-        // TODO: Implement bulk delete in Supabase
+        if supabaseService.isAuthenticated {
+            try await supabaseService.deleteAllMealEntriesForCurrentUser()
+        }
         deleteAllFoodsOffline()
+        scheduleNotificationRefresh()
     }
     
     func getTotalFoodsLogged() -> Int {
         return getTotalFoodsLoggedOffline()
     }
+
+    private func scheduleNotificationRefresh() {
+        NotificationCenter.default.post(name: .foodLogDidChange, object: nil)
+        Task {
+            await CoachNotificationService.shared.rescheduleNotifications()
+        }
+    }
+}
+
+extension Notification.Name {
+    static let foodLogDidChange = Notification.Name("FoodService.foodLogDidChange")
 }
 
 // MARK: - Error Handling
@@ -288,4 +312,4 @@ enum FoodServiceError: LocalizedError {
             return "Network connection error"
         }
     }
-} 
+}

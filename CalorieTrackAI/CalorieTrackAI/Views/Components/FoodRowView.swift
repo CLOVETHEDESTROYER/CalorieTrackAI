@@ -27,7 +27,7 @@ struct FoodRowView: View {
                 Text("\(Int(food.calories))")
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.blue)
+                    .foregroundColor(MFTTheme.accent)
                 
                 Text("calories")
                     .font(.caption)
@@ -56,4 +56,4 @@ struct MacroLabel: View {
                 .foregroundColor(.secondary)
         }
     }
-} 
+}

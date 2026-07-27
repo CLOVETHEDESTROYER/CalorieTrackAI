@@ -3,183 +3,36 @@ import SwiftUI
 struct ProfileView: View {
     @StateObject private var viewModel = ProfileViewModel()
     @State private var showingEditProfile = false
-    
+
     var body: some View {
         NavigationView {
             ZStack {
-                // Prominent glass background for iOS 18+
-                if #available(iOS 18.0, *) {
-                    LinearGradient(
-                        colors: [.blue.opacity(0.15), .green.opacity(0.1), .purple.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea()
-                }
-                
-            List {
-                // Profile Header
-                Section {
-                    HStack {
-                        Circle()
-                            .fill(Color.blue.gradient)
-                            .frame(width: 60, height: 60)
-                            .overlay(
-                                Text(viewModel.user.name.prefix(1).uppercased())
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                            )
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(viewModel.user.name)
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                            
-                            Text("Daily Goal: \(Int(viewModel.user.dailyCalorieGoal)) cal")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                settingsBackground
+
+                ScrollView {
+                    VStack(spacing: 18) {
+                        MFTPageHeader(
+                            kicker: "Your system",
+                            title: "Settings.",
+                            subtitle: "Targets, integrations, privacy, and account controls."
+                        )
+
+                        profileSummaryCard
+                        if AppFeatureFlags.unlockFeaturesForTesting {
+                            testingModeCard
                         }
-                        
-                        Spacer()
-                        
-                        Button("Edit") {
-                            showingEditProfile = true
-                        }
-                        .foregroundColor(.blue)
-                    }
-                    .padding(.vertical, 8)
-                }
-                
-                // Daily Calorie Goal Section
-                Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Daily Calorie Goal")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                            Spacer()
-                        }
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(Int(viewModel.user.dailyCalorieGoal))")
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.blue)
-                                Text("calories per day")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 4) {
-                                Text(viewModel.user.goalType.rawValue.capitalized)
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.primary)
-                                Text("Goal")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        if viewModel.user.goalType != .maintainWeight {
-                            HStack {
-                                Text("Weekly Target:")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text("\(abs(viewModel.user.weeklyWeightChange), specifier: "%.1f") lbs \(viewModel.user.goalType == .loseWeight ? "loss" : "gain")")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.blue)
-                            }
-                        }
+                        quickSettingsCard
+                        statsCard
+                        appSettingsCard
+                        dataActionsCard
                     }
                     .padding()
-                    .glassCard(tint: .blue, cornerRadius: 12)
-                    .glassBorder(tint: .blue, cornerRadius: 12)
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                }
-                
-                // Stats Section
-                Section("Your Stats") {
-                    StatsRowView(title: "Age", value: "\(viewModel.user.age) years")
-                    StatsRowView(title: "Weight", value: "\(formattedWeight(viewModel.user.weight, unit: viewModel.user.weightUnit))")
-                    StatsRowView(title: "Height", value: "\(formattedHeight(viewModel.user.height, unit: viewModel.user.heightUnit))")
-                    StatsRowView(title: "Activity Level", value: viewModel.user.activityLevel.rawValue)
-                    StatsRowView(title: "Goal", value: viewModel.user.goalType.rawValue)
-                }
-                
-                // Goals Section
-                Section("Progress") {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Current Streak")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Text("\(viewModel.currentStreak) days")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                        }
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing) {
-                            Text("Total Foods Logged")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Text("\(viewModel.totalFoodsLogged)")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                
-                // Settings Section
-                Section("Settings") {
-                    NavigationLink("Notifications") {
-                        NotificationSettingsView()
-                    }
-                    
-                    NavigationLink("Data Export") {
-                        DataExportView()
-                    }
-                    
-                    NavigationLink("About") {
-                        AboutView()
-                    }
-                }
-                
-                // Actions Section
-                Section {
-                    Button("Reset All Data", role: .destructive) {
-                        viewModel.showingResetAlert = true
-                    }
-                    .foregroundColor(.red)
-                    Button("Log Out", role: .destructive) {
-                        Task {
-                            do {
-                                try await SupabaseService.shared.signOut()
-                                // Optionally reset any local user state here
-                            } catch {
-                                #if DEBUG
-                                print("Logout failed: \(error)")
-                                #endif
-                            }
-                        }
-                    }
-                    .foregroundColor(.red)
                 }
             }
-            .scrollContentBackground(.hidden)
-            }
-            .navigationTitle("Profile")
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .mftPageChrome()
             .sheet(isPresented: $showingEditProfile, onDismiss: {
-                // Save the updated user data when the sheet is dismissed
                 viewModel.saveProfileSync()
             }) {
                 EditProfileView(user: $viewModel.user)
@@ -199,7 +52,7 @@ struct ProfileView: View {
                     }
                 }
             } message: {
-                Text("This will permanently delete all your food logs and reset your profile. This action cannot be undone.")
+                Text("This will permanently delete your food logs, plans, coach settings, gym check-ins, activity summaries, peptide logs, and profile reset data. This action cannot be undone.")
             }
             .overlay {
                 if viewModel.isLoading {
@@ -208,7 +61,7 @@ struct ProfileView: View {
                         .overlay(
                             ProgressView("Processing...")
                                 .padding()
-                                .background(Color.white)
+                                .background(MFTTheme.elevatedSurface)
                                 .cornerRadius(10)
                                 .shadow(radius: 10)
                         )
@@ -216,19 +69,296 @@ struct ProfileView: View {
             }
         }
     }
+
+    private var settingsBackground: some View {
+        MFTTheme.background
+            .ignoresSafeArea()
+    }
+
+    private var profileSummaryCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center, spacing: 14) {
+                Circle()
+                    .fill(MFTTheme.performance)
+                    .frame(width: 64, height: 64)
+                    .overlay(
+                        Text(viewModel.user.name.prefix(1).uppercased())
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                    )
+                    .overlay {
+                        Circle()
+                            .strokeBorder(MFTTheme.accent, lineWidth: 2)
+                    }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(viewModel.user.name)
+                        .font(.title2)
+                        .fontWeight(.black)
+
+                    Text("\(Int(viewModel.user.dailyCalorieGoal)) calories before the coach gets louder")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
+
+            HStack(spacing: 10) {
+                settingsMetric(title: "Goal", value: viewModel.user.goalType.rawValue.capitalized, tint: MFTTheme.accent)
+                settingsMetric(title: "Streak", value: "\(viewModel.currentStreak) days", tint: .white)
+                settingsMetric(title: "Logs", value: "\(viewModel.totalFoodsLogged)", tint: MFTTheme.amber)
+            }
+
+            GlassButton("Update Your Profile", icon: "person.crop.circle.badge.pencil", tint: .green, style: .primary) {
+                showingEditProfile = true
+            }
+        }
+        .padding()
+        .glassCard(tint: .green, cornerRadius: 12)
+        .glassBorder(tint: .green, cornerRadius: 12)
+    }
+
+    private var testingModeCard: some View {
+        let testingStatus = AppFeatureFlags.testingModeStatus(
+            isGuestMode: SupabaseService.shared.isGuestMode
+        )
+
+        return HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "testtube.2")
+                .font(.title3)
+                .foregroundColor(MFTTheme.accent)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(testingStatus.title)
+                        .font(.subheadline)
+                        .fontWeight(.black)
+
+                    Text(testingStatus.badge)
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(MFTTheme.subduedLime)
+                        .foregroundColor(MFTTheme.accent)
+                        .cornerRadius(8)
+                }
+
+                Text(testingStatus.detail)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+        }
+        .padding()
+        .glassCard(tint: .green, cornerRadius: 12)
+        .glassBorder(tint: .green, cornerRadius: 12)
+    }
+
+    private var quickSettingsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Control Center")
+                .font(.headline)
+                .fontWeight(.black)
+
+            HStack(spacing: 10) {
+                settingsMetric(title: "Plan", value: viewModel.planStatusDisplay, tint: MFTTheme.accent)
+                settingsMetric(title: "Health", value: viewModel.healthStatusDisplay, tint: .white)
+                settingsMetric(title: "Gyms", value: viewModel.gymStatusDisplay, tint: MFTTheme.amber)
+            }
+
+            VStack(spacing: 10) {
+                NavigationLink {
+                    PlanBuilderView()
+                } label: {
+                    settingsNavRow(title: "Meal + Workout Plan", detail: viewModel.mealPlanSettingsDetail, icon: "list.clipboard.fill", tint: .blue)
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    ActivityCoachView()
+                } label: {
+                    settingsNavRow(title: "Apple Health, Watch + Gyms", detail: viewModel.activitySettingsDetail, icon: "figure.walk.circle.fill", tint: .green)
+                }
+                .buttonStyle(.plain)
+
+            }
+        }
+        .padding()
+        .glassCard(tint: .neutral, cornerRadius: 12)
+    }
+
+    private var statsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Profile Snapshot")
+                .font(.headline)
+                .fontWeight(.black)
+
+            StatsRowView(title: "Age", value: "\(viewModel.user.age) years")
+            StatsRowView(title: "Weight", value: formattedWeight(viewModel.user.weight, unit: viewModel.user.weightUnit))
+            StatsRowView(title: "Height", value: formattedHeight(viewModel.user.height, unit: viewModel.user.heightUnit))
+            StatsRowView(title: "Activity Level", value: viewModel.user.activityLevel.rawValue)
+            StatsRowView(title: "Weekly Target", value: weeklyTargetText)
+        }
+        .padding()
+        .glassCard(tint: .neutral, cornerRadius: 12)
+    }
+
+    private var appSettingsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Coach + App Controls")
+                .font(.headline)
+                .fontWeight(.black)
+
+            NavigationLink {
+                CoachSettingsView()
+            } label: {
+                settingsNavRow(title: "Coach Tone", detail: "Tune how loud the tough love gets.", icon: "quote.bubble.fill", tint: .orange)
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                NotificationSettingsView()
+            } label: {
+                settingsNavRow(title: "Notifications", detail: "Meal reminders, movement nudges, gym receipts.", icon: "bell.badge.fill", tint: .red)
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                DataExportView()
+            } label: {
+                settingsNavRow(title: "Data Export", detail: "Review saved app data.", icon: "square.and.arrow.up.fill", tint: .blue)
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                HistoryView()
+            } label: {
+                settingsNavRow(title: "History", detail: "Review food receipts and daily progress.", icon: "clock.arrow.circlepath", tint: .green)
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                AboutView()
+            } label: {
+                settingsNavRow(title: "About", detail: "Version and review notes.", icon: "info.circle.fill", tint: .secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding()
+        .glassCard(tint: .neutral, cornerRadius: 12)
+    }
+
+    private var dataActionsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Account Actions")
+                .font(.headline)
+                .fontWeight(.black)
+
+            Button(role: .destructive) {
+                viewModel.showingResetAlert = true
+            } label: {
+                settingsNavRow(title: "Reset All Data", detail: "Delete local/server logs and start over.", icon: "trash.fill", tint: .red)
+            }
+            .buttonStyle(.plain)
+
+            Button(role: .destructive) {
+                Task {
+                    do {
+                        try await SupabaseService.shared.signOut()
+                    } catch {
+                        #if DEBUG
+                        print("Logout failed: \(error)")
+                        #endif
+                    }
+                }
+            } label: {
+                settingsNavRow(title: "Log Out", detail: "Sign out of this device.", icon: "rectangle.portrait.and.arrow.right.fill", tint: .red)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding()
+        .glassCard(tint: .red, cornerRadius: 12)
+        .glassBorder(tint: .red, cornerRadius: 12)
+    }
+
+    private var weeklyTargetText: String {
+        guard viewModel.user.goalType != .maintainWeight else {
+            return "Maintain"
+        }
+
+        let weeklyChange = String(format: "%.1f", abs(viewModel.user.weeklyWeightChange))
+        return "\(weeklyChange) lb \(viewModel.user.goalType == .loseWeight ? "loss" : "gain")"
+    }
+
+    private func settingsMetric(title: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.bold)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+        .padding(10)
+        .background(tint.opacity(0.09))
+        .cornerRadius(10)
+    }
+
+    private func settingsNavRow(title: String, detail: String, icon: String, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.headline)
+                .foregroundColor(tint)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(.secondary)
+                .padding(.top, 3)
+        }
+        .padding(10)
+        .background(Color.primary.opacity(0.04))
+        .cornerRadius(10)
+        .contentShape(Rectangle())
+    }
 }
 
 struct StatsRowView: View {
     let title: String
     let value: String
-    
+
     var body: some View {
         HStack {
             Text(title)
                 .foregroundColor(.primary)
-            
+
             Spacer()
-            
+
             Text(value)
                 .foregroundColor(.secondary)
         }
@@ -247,4 +377,4 @@ private func formattedHeight(_ height: Double, unit: User.HeightUnit) -> String 
     case .cm: return "\(Int(height)) cm"
     case .inch: return "\(Int(height)) in"
     }
-} 
+}

@@ -6,34 +6,10 @@ class OpenAIService: ObservableObject {
     
     @Published var isLoading = false
     
-    private let apiKey: String
-    private let baseURL = "https://api.openai.com/v1"
-    private let model = "gpt-4o-2024-08-06" // More accurate model for nutrition analysis
+    private let aiProxyClient: SupabaseAIFunctionClient?
     
     private init() {
-        // Load configuration from Info.plist (which reads from Config.xcconfig)
-        let configuredKey = Bundle.main.object(forInfoDictionaryKey: "OPENAI_API_KEY") as? String ?? ""
-        
-        // Validate API key configuration
-        if configuredKey.isEmpty || configuredKey == "your-openai-api-key-here" || configuredKey == "$(OPENAI_API_KEY)" {
-            #if DEBUG
-            print("""
-            ⚠️ OpenAI API key not configured!
-            
-            To set up OpenAI integration:
-            1. Copy Config.xcconfig.template to Config.xcconfig
-            2. Get your API key from: https://platform.openai.com/api-keys
-            3. Add your key to Config.xcconfig: OPENAI_API_KEY = sk-your-key-here
-            
-            Current value: '\(configuredKey)'
-            
-            AI features will be disabled until configured.
-            """)
-            #endif
-            self.apiKey = ""
-        } else {
-            self.apiKey = configuredKey
-        }
+        self.aiProxyClient = SupabaseAIFunctionClient(bundle: .main)
     }
     
     // MARK: - Meal Analysis
@@ -41,21 +17,17 @@ class OpenAIService: ObservableObject {
     func analyzeMealDescription(_ description: String) async throws -> MealAnalysis {
         isLoading = true
         defer { isLoading = false }
-        
-        let prompt = createMealAnalysisPrompt(description: description)
-        
-        let response = try await sendChatCompletion(
-            messages: [
-                ChatMessage(role: "system", content: mealAnalysisSystemPrompt),
-                ChatMessage(role: "user", content: prompt)
-            ]
-        )
-        
-        guard case .left(let content) = response.choices.first?.message.content else {
-            throw OpenAIError.invalidResponse
+
+        guard let aiProxyClient else {
+            throw OpenAIError.proxyNotConfigured
         }
-        
-        return try parseMealAnalysisResponse(content)
+
+        let accessToken = try? await SupabaseService.shared.client.auth.session.accessToken
+        return try await aiProxyClient.analyzeMealDescription(
+            description,
+            accessToken: accessToken,
+            allowsTestingGuestAccess: AppFeatureFlags.unlockFeaturesForTesting
+        )
     }
     
     // MARK: - Daily Meal Suggestions
@@ -66,24 +38,34 @@ class OpenAIService: ObservableObject {
     ) async throws -> DailyMealPlan {
         isLoading = true
         defer { isLoading = false }
-        
-        let prompt = createMealSuggestionPrompt(
-            userProfile: userProfile,
-            preferences: preferences
-        )
-        
-        let response = try await sendChatCompletion(
-            messages: [
-                ChatMessage(role: "system", content: mealSuggestionSystemPrompt),
-                ChatMessage(role: "user", content: prompt)
-            ]
-        )
-        
-        guard case .left(let content) = response.choices.first?.message.content else {
-            throw OpenAIError.invalidResponse
+
+        guard let aiProxyClient else {
+            throw OpenAIError.proxyNotConfigured
         }
-        
-        return try parseMealSuggestionResponse(content)
+
+        let accessToken = try? await SupabaseService.shared.client.auth.session.accessToken
+        return try await aiProxyClient.suggestDailyMeals(
+            for: userProfile,
+            preferences: preferences,
+            accessToken: accessToken,
+            allowsTestingGuestAccess: AppFeatureFlags.unlockFeaturesForTesting
+        )
+    }
+
+    func suggestMacroCatchUp(for budget: MacroCatchUpBudget) async throws -> MacroCatchUpSuggestion {
+        isLoading = true
+        defer { isLoading = false }
+
+        guard let aiProxyClient else {
+            throw OpenAIError.proxyNotConfigured
+        }
+
+        let accessToken = try? await SupabaseService.shared.client.auth.session.accessToken
+        return try await aiProxyClient.suggestMacroCatchUp(
+            for: budget,
+            accessToken: accessToken,
+            allowsTestingGuestAccess: AppFeatureFlags.unlockFeaturesForTesting
+        )
     }
     
     // MARK: - Food Recognition from Description
@@ -92,292 +74,48 @@ class OpenAIService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        let prompt = """
-        Analyze this food description and identify individual food items with their estimated quantities:
-        "\(description)"
-        
-        For each food item, provide:
-        - Food name
-        - Estimated quantity/serving size
-        - Confidence level (0-100)
-        """
-        
-        let response = try await sendChatCompletion(
-            messages: [
-                ChatMessage(role: "system", content: foodRecognitionSystemPrompt),
-                ChatMessage(role: "user", content: prompt)
-            ]
-        )
-        
-        guard case .left(let content) = response.choices.first?.message.content else {
-            throw OpenAIError.invalidResponse
+        guard let aiProxyClient else {
+            throw OpenAIError.proxyNotConfigured
         }
-        
-        return try parseFoodRecognitionResponse(content)
+
+        let accessToken = try? await SupabaseService.shared.client.auth.session.accessToken
+        return try await aiProxyClient.recognizeFoodFromDescription(
+            description,
+            accessToken: accessToken,
+            allowsTestingGuestAccess: AppFeatureFlags.unlockFeaturesForTesting
+        )
     }
     
     // MARK: - API Testing
     
     func testAPIAccess() async throws -> Bool {
-        #if DEBUG
-        print("Testing OpenAI API access...")
-        #endif
-        
-        let testRequest = ChatCompletionRequest(
-            model: "gpt-4o-2024-08-06", // Use the same model version for consistency
-            messages: [
-                ChatMessage(role: "user", content: "Hello")
-            ],
-            temperature: 0.3,
-            max_tokens: 10
+        guard let aiProxyClient else {
+            throw OpenAIError.proxyNotConfigured
+        }
+
+        let accessToken = try? await SupabaseService.shared.client.auth.session.accessToken
+        return try await aiProxyClient.testAccess(
+            accessToken: accessToken,
+            allowsTestingGuestAccess: AppFeatureFlags.unlockFeaturesForTesting
         )
-        
-        let url = URL(string: "\(baseURL)/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(testRequest)
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw OpenAIError.networkError
-        }
-        
-        #if DEBUG
-        print("API Test Response Status: \(httpResponse.statusCode)")
-        if let responseString = String(data: data, encoding: .utf8) {
-            print("API Test Response: \(responseString)")
-        }
-        #endif
-        
-        return httpResponse.statusCode == 200
     }
     
     // MARK: - Image Analysis
     
     func analyzeFoodImage(_ imageData: Data) async throws -> MealAnalysis {
-        // Check if current model supports vision
-        guard model == "gpt-4o" || model == "gpt-4o-2024-08-06" else {
-            throw OpenAIError.featureNotAvailable("Image analysis requires GPT-4o model. Current model: \(model)")
-        }
-        
-        #if DEBUG
-        print("Starting image analysis with model: \(model)")
-        print("Image data size: \(imageData.count) bytes")
-        #endif
-        
         isLoading = true
         defer { isLoading = false }
-        
-        // Convert image to base64
-        let base64Image = imageData.base64EncodedString()
-        
-        let prompt = """
-        Analyze this food image and provide detailed nutritional information.
-        Please provide:
-        1. Total estimated calories
-        2. Protein (grams)
-        3. Carbohydrates (grams)
-        4. Fat (grams)
-        5. Fiber (grams, if applicable)
-        6. List of identified food items with individual nutrition
-        7. Confidence level for the analysis (0-100)
-        8. Any assumptions made about portion sizes
-        
-        Be as accurate as possible based on visual analysis.
-        """
-        
-        // Create a simplified vision request structure
-        let visionRequest = VisionRequest(
-            model: "gpt-4o-2024-08-06", // Use the specific model version that supports vision
-            messages: [
-                VisionMessage(
-                    role: "system",
-                    content: mealAnalysisSystemPrompt
-                ),
-                VisionMessage(
-                    role: "user",
-                    content: [
-                        VisionContent(
-                            type: "text",
-                            text: prompt
-                        ),
-                        VisionContent(
-                            type: "image_url",
-                            image_url: VisionImageUrl(
-                                url: "data:image/jpeg;base64,\(base64Image)"
-                            )
-                        )
-                    ]
-                )
-            ],
-            temperature: 0.3,
-            max_tokens: 1500
+
+        guard let aiProxyClient else {
+            throw OpenAIError.proxyNotConfigured
+        }
+
+        let accessToken = try? await SupabaseService.shared.client.auth.session.accessToken
+        return try await aiProxyClient.analyzeFoodImage(
+            imageData,
+            accessToken: accessToken,
+            allowsTestingGuestAccess: AppFeatureFlags.unlockFeaturesForTesting
         )
-        
-        #if DEBUG
-        print("Sending vision request with \(visionRequest.messages.count) messages")
-        if let requestData = try? JSONEncoder().encode(visionRequest),
-           let requestString = String(data: requestData, encoding: .utf8) {
-            print("Request JSON: \(requestString)")
-        }
-        #endif
-        
-        let response = try await sendVisionRequest(visionRequest)
-
-        // Extract the content from the response
-        guard let message = response.choices.first?.message else {
-            throw OpenAIError.invalidResponse
-        }
-
-        // Handle both string and array content types
-        let content: String
-        switch message.content {
-        case .left(let stringContent):
-            content = stringContent
-        case .right(let arrayContent):
-            // If it's an array, try to extract text content
-            if let textContent = arrayContent.first(where: { $0.text != nil })?.text {
-                content = textContent
-            } else {
-                throw OpenAIError.invalidResponse
-            }
-        }
-
-        #if DEBUG
-        print("Extracted content: \(content)")
-        #endif
-
-        return try parseMealAnalysisResponse(content)
-    }
-    
-    // MARK: - Private API Methods
-    
-    private func sendChatCompletion(messages: [ChatMessage]) async throws -> ChatCompletionResponse {
-        guard !apiKey.isEmpty && apiKey != "your-openai-api-key-here" else {
-            throw OpenAIError.invalidAPIKey
-        }
-        
-        let url = URL(string: "\(baseURL)/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let requestBody = ChatCompletionRequest(
-            model: model,
-            messages: messages,
-            temperature: 0.3, // Lower temperature for more consistent nutrition analysis
-            max_tokens: 1500
-        )
-        
-        request.httpBody = try JSONEncoder().encode(requestBody)
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw OpenAIError.networkError
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            if let errorData = try? JSONDecoder().decode(OpenAIErrorResponse.self, from: data) {
-                throw OpenAIError.apiError(errorData.error.message)
-            }
-            throw OpenAIError.httpError(httpResponse.statusCode)
-        }
-        
-        return try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
-    }
-    
-    private func sendVisionCompletion(messages: [ChatMessage]) async throws -> ChatCompletionResponse {
-        guard !apiKey.isEmpty && apiKey != "your-openai-api-key-here" else {
-            throw OpenAIError.invalidAPIKey
-        }
-        
-        let url = URL(string: "\(baseURL)/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        // Use gpt-4o specifically for vision (not the dynamic model)
-        let requestBody = ChatCompletionRequest(
-            model: "gpt-4o", // Force gpt-4o for vision
-            messages: messages,
-            temperature: 0.3,
-            max_tokens: 1500
-        )
-        
-        request.httpBody = try JSONEncoder().encode(requestBody)
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw OpenAIError.networkError
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            if let errorData = try? JSONDecoder().decode(OpenAIErrorResponse.self, from: data) {
-                throw OpenAIError.apiError(errorData.error.message)
-            }
-            throw OpenAIError.httpError(httpResponse.statusCode)
-        }
-        
-        return try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
-    }
-    
-    private func sendVisionRequest(_ visionRequest: VisionRequest) async throws -> ChatCompletionResponse {
-        guard !apiKey.isEmpty && apiKey != "your-openai-api-key-here" else {
-            throw OpenAIError.invalidAPIKey
-        }
-        
-        let url = URL(string: "\(baseURL)/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 60 // 60 second timeout
-        
-        request.httpBody = try JSONEncoder().encode(visionRequest)
-        
-        #if DEBUG
-        print("Sending vision request to OpenAI...")
-        print("Request URL: \(url)")
-        print("Request headers: \(request.allHTTPHeaderFields ?? [:])")
-        #endif
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw OpenAIError.networkError
-        }
-        
-        #if DEBUG
-        print("Vision API Response Status: \(httpResponse.statusCode)")
-        if let responseString = String(data: data, encoding: .utf8) {
-            print("Vision API Response: \(responseString)")
-        }
-        #endif
-        
-        guard httpResponse.statusCode == 200 else {
-            #if DEBUG
-            print("OpenAI Vision API Error - Status: \(httpResponse.statusCode)")
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("Vision Error Response: \(responseString)")
-            }
-            #endif
-            
-            if let errorData = try? JSONDecoder().decode(OpenAIErrorResponse.self, from: data) {
-                let errorMessage = errorData.error.message
-                print("OpenAI Vision API Error: \(errorMessage)")
-                throw OpenAIError.apiError(errorMessage)
-            }
-            throw OpenAIError.httpError(httpResponse.statusCode)
-        }
-        
-        return try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
     }
     
     // MARK: - Prompt Creation
@@ -386,18 +124,29 @@ class OpenAIService: ObservableObject {
         return """
         Analyze this meal description and provide detailed nutritional information:
         "\(description)"
-        
-        Please provide:
-        1. Total estimated calories
-        2. Protein (grams)
-        3. Carbohydrates (grams)
-        4. Fat (grams)
-        5. Fiber (grams, if applicable)
-        6. List of identified food items with individual nutrition
-        7. Confidence level for the analysis (0-100)
-        8. Any assumptions made
-        
-        Be as accurate as possible based on standard nutritional data.
+
+        Return valid JSON only using this exact shape:
+        {
+          "totalCalories": 0,
+          "protein": 0,
+          "carbohydrates": 0,
+          "fat": 0,
+          "fiber": 0,
+          "confidence": 0,
+          "foodItems": [
+            {
+              "name": "string",
+              "quantity": "string",
+              "calories": 0,
+              "protein": 0,
+              "carbohydrates": 0,
+              "fat": 0
+            }
+          ],
+          "assumptions": ["string"]
+        }
+
+        Use grams for macros and fiber. Use a confidence value from 0 to 100.
         """
     }
     
@@ -428,22 +177,67 @@ class OpenAIService: ObservableObject {
         - Meal complexity: \(preferences.complexity.rawValue)
         - Budget level: \(preferences.budgetLevel.rawValue)
         
-        Please suggest:
-        1. Breakfast with calories and macros
-        2. Lunch with calories and macros
-        3. Dinner with calories and macros
-        4. 2 healthy snacks with calories and macros
-        5. Brief preparation instructions for each meal
-        
-        Ensure the total daily nutrition aligns with the targets.
+        Return valid JSON only using this exact shape:
+        {
+          "breakfast": {
+            "name": "string",
+            "description": "string",
+            "calories": 0,
+            "protein": 0,
+            "carbohydrates": 0,
+            "fat": 0,
+            "ingredients": ["string"],
+            "instructions": "string"
+          },
+          "lunch": {
+            "name": "string",
+            "description": "string",
+            "calories": 0,
+            "protein": 0,
+            "carbohydrates": 0,
+            "fat": 0,
+            "ingredients": ["string"],
+            "instructions": "string"
+          },
+          "dinner": {
+            "name": "string",
+            "description": "string",
+            "calories": 0,
+            "protein": 0,
+            "carbohydrates": 0,
+            "fat": 0,
+            "ingredients": ["string"],
+            "instructions": "string"
+          },
+          "snacks": [
+            {
+              "name": "string",
+              "description": "string",
+              "calories": 0,
+              "protein": 0,
+              "carbohydrates": 0,
+              "fat": 0,
+              "ingredients": ["string"],
+              "instructions": "string"
+            }
+          ],
+          "totalCalories": 0,
+          "totalProtein": 0,
+          "totalCarbs": 0,
+          "totalFat": 0
+        }
+
+        Include exactly two snacks. Keep the daily totals aligned with the target calories and macros.
         """
     }
     
     // MARK: - Response Parsing
     
     private func parseMealAnalysisResponse(_ content: String) throws -> MealAnalysis {
-        // For production, you might want to use structured JSON responses
-        // This is a simplified parser for demonstration
+        if let jsonData = extractJSONData(from: content),
+           let analysis = try? JSONDecoder().decode(MealAnalysis.self, from: jsonData) {
+            return normalize(analysis)
+        }
         
         let lines = content.components(separatedBy: .newlines)
         var calories: Double = 0
@@ -460,13 +254,6 @@ class OpenAIService: ObservableObject {
         var foundCarbs = false
         var foundFat = false
         
-        #if DEBUG
-        print("Parsing content lines:")
-        for (index, line) in lines.enumerated() {
-            print("Line \(index): \(line)")
-        }
-        #endif
-        
         for line in lines {
             let lowercased = line.lowercased()
             
@@ -474,42 +261,24 @@ class OpenAIService: ObservableObject {
                 let extracted = extractNumber(from: line) ?? 0
                 calories = extracted
                 foundCalories = true
-                #if DEBUG
-                print("Found calories: \(extracted) from line: \(line)")
-                #endif
             } else if lowercased.contains("protein") {
                 let extracted = extractNumber(from: line) ?? 0
                 protein = extracted
                 foundProtein = true
-                #if DEBUG
-                print("Found protein: \(extracted) from line: \(line)")
-                #endif
             } else if lowercased.contains("carbohydrate") {
                 let extracted = extractNumber(from: line) ?? 0
                 carbs = extracted
                 foundCarbs = true
-                #if DEBUG
-                print("Found carbs: \(extracted) from line: \(line)")
-                #endif
             } else if lowercased.contains("fat") && !lowercased.contains("saturated") {
                 let extracted = extractNumber(from: line) ?? 0
                 fat = extracted
                 foundFat = true
-                #if DEBUG
-                print("Found fat: \(extracted) from line: \(line)")
-                #endif
             } else if lowercased.contains("fiber") {
                 let extracted = extractNumber(from: line) ?? 0
                 fiber = extracted
-                #if DEBUG
-                print("Found fiber: \(extracted) from line: \(line)")
-                #endif
             } else if lowercased.contains("confidence") {
                 let extractedConfidence = extractNumber(from: line) ?? 50
                 confidence = Int(max(0, min(100, extractedConfidence))) // Clamp to 0-100
-                #if DEBUG
-                print("Found confidence: \(confidence) from line: \(line)")
-                #endif
             }
         }
         
@@ -549,7 +318,11 @@ class OpenAIService: ObservableObject {
     }
     
     private func parseMealSuggestionResponse(_ content: String) throws -> DailyMealPlan {
-        // Simplified parsing - in production, consider using structured JSON responses
+        if let jsonData = extractJSONData(from: content),
+           let plan = try? JSONDecoder().decode(DailyMealPlan.self, from: jsonData) {
+            return normalize(plan)
+        }
+
         let sections = content.components(separatedBy: "\n\n")
         
         return DailyMealPlan(
@@ -563,6 +336,97 @@ class OpenAIService: ObservableObject {
             totalProtein: 0,
             totalCarbs: 0,
             totalFat: 0
+        )
+    }
+
+    private func extractJSONData(from content: String) -> Data? {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmed.hasPrefix("{"), trimmed.hasSuffix("}") {
+            return Data(trimmed.utf8)
+        }
+
+        if let fencedJSON = extractFencedJSON(from: trimmed) {
+            return Data(fencedJSON.utf8)
+        }
+
+        guard let start = trimmed.firstIndex(of: "{"),
+              let end = trimmed.lastIndex(of: "}"),
+              start <= end else {
+            return nil
+        }
+
+        return Data(String(trimmed[start...end]).utf8)
+    }
+
+    private func extractFencedJSON(from content: String) -> String? {
+        let fencePattern = #"```(?:json)?\s*([\s\S]*?)\s*```"#
+        guard let regex = try? NSRegularExpression(pattern: fencePattern, options: [.caseInsensitive]) else {
+            return nil
+        }
+
+        let range = NSRange(content.startIndex..., in: content)
+        guard let match = regex.firstMatch(in: content, range: range),
+              let jsonRange = Range(match.range(at: 1), in: content) else {
+            return nil
+        }
+
+        return String(content[jsonRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func normalize(_ analysis: MealAnalysis) -> MealAnalysis {
+        MealAnalysis(
+            totalCalories: max(0, analysis.totalCalories),
+            protein: max(0, analysis.protein),
+            carbohydrates: max(0, analysis.carbohydrates),
+            fat: max(0, analysis.fat),
+            fiber: max(0, analysis.fiber),
+            confidence: max(0, min(100, analysis.confidence)),
+            foodItems: analysis.foodItems.map(normalize),
+            assumptions: analysis.assumptions
+        )
+    }
+
+    private func normalize(_ food: AnalyzedFood) -> AnalyzedFood {
+        AnalyzedFood(
+            name: food.name,
+            quantity: food.quantity,
+            calories: max(0, food.calories),
+            protein: max(0, food.protein),
+            carbohydrates: max(0, food.carbohydrates),
+            fat: max(0, food.fat)
+        )
+    }
+
+    private func normalize(_ plan: DailyMealPlan) -> DailyMealPlan {
+        let meals = [plan.breakfast, plan.lunch, plan.dinner] + plan.snacks
+        let calculatedCalories = meals.reduce(0) { $0 + max(0, $1.calories) }
+        let calculatedProtein = meals.reduce(0) { $0 + max(0, $1.protein) }
+        let calculatedCarbs = meals.reduce(0) { $0 + max(0, $1.carbohydrates) }
+        let calculatedFat = meals.reduce(0) { $0 + max(0, $1.fat) }
+
+        return DailyMealPlan(
+            breakfast: normalize(plan.breakfast),
+            lunch: normalize(plan.lunch),
+            dinner: normalize(plan.dinner),
+            snacks: plan.snacks.map(normalize),
+            totalCalories: plan.totalCalories > 0 ? plan.totalCalories : calculatedCalories,
+            totalProtein: plan.totalProtein > 0 ? plan.totalProtein : calculatedProtein,
+            totalCarbs: plan.totalCarbs > 0 ? plan.totalCarbs : calculatedCarbs,
+            totalFat: plan.totalFat > 0 ? plan.totalFat : calculatedFat
+        )
+    }
+
+    private func normalize(_ meal: SuggestedMeal) -> SuggestedMeal {
+        SuggestedMeal(
+            name: meal.name,
+            description: meal.description,
+            calories: max(0, meal.calories),
+            protein: max(0, meal.protein),
+            carbohydrates: max(0, meal.carbohydrates),
+            fat: max(0, meal.fat),
+            ingredients: meal.ingredients,
+            instructions: meal.instructions
         )
     }
     
@@ -766,6 +630,27 @@ struct ChatCompletionRequest: Codable {
     let messages: [ChatMessage]
     let temperature: Double
     let max_tokens: Int
+    let response_format: ResponseFormat?
+
+    init(
+        model: String,
+        messages: [ChatMessage],
+        temperature: Double,
+        max_tokens: Int,
+        response_format: ResponseFormat? = nil
+    ) {
+        self.model = model
+        self.messages = messages
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.response_format = response_format
+    }
+}
+
+struct ResponseFormat: Codable {
+    let type: String
+
+    static let jsonObject = ResponseFormat(type: "json_object")
 }
 
 struct ChatMessage: Codable {
@@ -910,6 +795,9 @@ enum OpenAIError: LocalizedError {
     case httpError(Int)
     case parsingError
     case featureNotAvailable(String)
+    case proxyAuthenticationRequired
+    case proxyNotConfigured
+    case proxyError(String)
     
     var errorDescription: String? {
         switch self {
@@ -927,6 +815,254 @@ enum OpenAIError: LocalizedError {
             return "Failed to parse response"
         case .featureNotAvailable(let message):
             return message
+        case .proxyAuthenticationRequired:
+            return "Sign in to use AI meal analysis, or add SUPABASE_ANON_KEY for signed-out TestFlight QA while testing mode is enabled."
+        case .proxyNotConfigured:
+            return "Supabase AI proxy is not configured. Add Supabase URL and publishable key, then deploy mft-ai-coach."
+        case .proxyError(let message):
+            return "AI proxy error: \(message)"
         }
     }
 } 
+
+// MARK: - Supabase AI Proxy
+
+struct SupabaseAIFunctionClient {
+    private let supabaseURL: URL
+    private let apiKey: String
+    private let testingGuestAccessToken: String?
+    private let functionName: String
+    private let session: URLSession
+
+    init?(
+        bundle: Bundle = .main,
+        functionName: String = "mft-ai-coach",
+        session: URLSession = .shared
+    ) {
+        let publishableKey = bundle.object(forInfoDictionaryKey: "SUPABASE_PUBLISHABLE_KEY") as? String
+        let anonKey = bundle.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String
+        let normalizedPublishableKey = Self.normalizedSupabaseKey(publishableKey)
+        let normalizedAnonKey = Self.normalizedSupabaseKey(anonKey)
+        let supabaseKey = normalizedPublishableKey ?? normalizedAnonKey
+
+        guard let rawURL = bundle.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
+              rawURL != "your-supabase-url-here",
+              rawURL != "$(SUPABASE_URL)",
+              let url = URL(string: rawURL),
+              let supabaseKey else {
+            return nil
+        }
+
+        self.init(
+            supabaseURL: url,
+            apiKey: supabaseKey,
+            testingGuestAccessToken: normalizedAnonKey,
+            functionName: functionName,
+            session: session
+        )
+    }
+
+    init(
+        supabaseURL: URL,
+        apiKey: String,
+        testingGuestAccessToken: String? = nil,
+        functionName: String = "mft-ai-coach",
+        session: URLSession = .shared
+    ) {
+        self.supabaseURL = supabaseURL
+        self.apiKey = apiKey
+        self.testingGuestAccessToken = testingGuestAccessToken
+        self.functionName = functionName
+        self.session = session
+    }
+
+    func analyzeMealDescription(
+        _ description: String,
+        accessToken: String?,
+        allowsTestingGuestAccess: Bool = false
+    ) async throws -> MealAnalysis {
+        try await invoke(
+            SupabaseAIRequest(action: .mealAnalysis, description: description),
+            accessToken: accessToken,
+            allowsTestingGuestAccess: allowsTestingGuestAccess,
+            responseType: MealAnalysis.self
+        )
+    }
+
+    func recognizeFoodFromDescription(
+        _ description: String,
+        accessToken: String?,
+        allowsTestingGuestAccess: Bool = false
+    ) async throws -> [FoodRecognition] {
+        try await invoke(
+            SupabaseAIRequest(action: .foodRecognition, description: description),
+            accessToken: accessToken,
+            allowsTestingGuestAccess: allowsTestingGuestAccess,
+            responseType: [FoodRecognition].self
+        )
+    }
+
+    func analyzeFoodImage(
+        _ imageData: Data,
+        accessToken: String?,
+        allowsTestingGuestAccess: Bool = false
+    ) async throws -> MealAnalysis {
+        try await invoke(
+            SupabaseAIRequest(action: .foodImageAnalysis, imageBase64: imageData.base64EncodedString()),
+            accessToken: accessToken,
+            allowsTestingGuestAccess: allowsTestingGuestAccess,
+            responseType: MealAnalysis.self
+        )
+    }
+
+    func testAccess(accessToken: String?, allowsTestingGuestAccess: Bool = false) async throws -> Bool {
+        let health = try await invoke(
+            SupabaseAIRequest(action: .health),
+            accessToken: accessToken,
+            allowsTestingGuestAccess: allowsTestingGuestAccess,
+            responseType: SupabaseAIFunctionHealth.self
+        )
+
+        return health.ok
+    }
+
+    func suggestDailyMeals(
+        for userProfile: UserProfile,
+        preferences: MealPreferences,
+        accessToken: String?,
+        allowsTestingGuestAccess: Bool = false
+    ) async throws -> DailyMealPlan {
+        try await invoke(
+            SupabaseAIRequest(action: .dailyMealPlan, userProfile: userProfile, preferences: preferences),
+            accessToken: accessToken,
+            allowsTestingGuestAccess: allowsTestingGuestAccess,
+            responseType: DailyMealPlan.self
+        )
+    }
+
+    func suggestMacroCatchUp(
+        for budget: MacroCatchUpBudget,
+        accessToken: String?,
+        allowsTestingGuestAccess: Bool = false
+    ) async throws -> MacroCatchUpSuggestion {
+        let suggestion: MacroCatchUpSuggestion = try await invoke(
+            SupabaseAIRequest(action: .macroCatchUp, macroBudget: budget),
+            accessToken: accessToken,
+            allowsTestingGuestAccess: allowsTestingGuestAccess,
+            responseType: MacroCatchUpSuggestion.self
+        )
+
+        guard suggestion.calories <= budget.caloriesRemaining + 5,
+              suggestion.carbohydrates <= budget.carbohydratesRemaining + 3,
+              suggestion.fat <= budget.fatRemaining + 2,
+              suggestion.protein > 0 else {
+            throw OpenAIError.proxyError("The coach suggestion did not fit the remaining macro budget. Try again.")
+        }
+
+        return suggestion
+    }
+
+    func makeRequest<Payload: Encodable>(
+        _ payload: Payload,
+        accessToken: String?,
+        allowsTestingGuestAccess: Bool = false
+    ) throws -> URLRequest {
+        let authorizationToken = Self.normalizedSupabaseKey(accessToken)
+            ?? (allowsTestingGuestAccess ? testingGuestAccessToken : nil)
+
+        guard let authorizationToken else {
+            throw OpenAIError.proxyAuthenticationRequired
+        }
+
+        let functionURL = supabaseURL
+            .appendingPathComponent("functions")
+            .appendingPathComponent("v1")
+            .appendingPathComponent(functionName)
+
+        var request = URLRequest(url: functionURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 60
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(authorizationToken)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(payload)
+        return request
+    }
+
+    private func invoke<Payload: Encodable, Response: Decodable>(
+        _ payload: Payload,
+        accessToken: String?,
+        allowsTestingGuestAccess: Bool,
+        responseType: Response.Type
+    ) async throws -> Response {
+        let request = try makeRequest(
+            payload,
+            accessToken: accessToken,
+            allowsTestingGuestAccess: allowsTestingGuestAccess
+        )
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OpenAIError.networkError
+        }
+
+        if httpResponse.statusCode != 200 {
+            if let errorEnvelope = try? JSONDecoder().decode(SupabaseAIFunctionErrorEnvelope.self, from: data) {
+                throw OpenAIError.proxyError(errorEnvelope.error)
+            }
+
+            throw OpenAIError.httpError(httpResponse.statusCode)
+        }
+
+        if let envelope = try? JSONDecoder().decode(SupabaseAIFunctionEnvelope<Response>.self, from: data),
+           let decoded = envelope.data {
+            return decoded
+        }
+
+        return try JSONDecoder().decode(Response.self, from: data)
+    }
+
+    private static func normalizedSupabaseKey(_ value: String?) -> String? {
+        guard let key = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !key.isEmpty,
+              key != "your-supabase-publishable-key-here",
+              key != "your-supabase-anon-key-here",
+              key != "$(SUPABASE_PUBLISHABLE_KEY)",
+              key != "$(SUPABASE_ANON_KEY)" else {
+            return nil
+        }
+
+        return key
+    }
+}
+
+private struct SupabaseAIRequest: Encodable {
+    enum Action: String, Encodable {
+        case health
+        case mealAnalysis
+        case dailyMealPlan
+        case macroCatchUp
+        case foodRecognition
+        case foodImageAnalysis
+    }
+
+    let action: Action
+    var description: String?
+    var imageBase64: String?
+    var userProfile: UserProfile?
+    var preferences: MealPreferences?
+    var macroBudget: MacroCatchUpBudget?
+}
+
+private struct SupabaseAIFunctionHealth: Decodable {
+    let ok: Bool
+}
+
+private struct SupabaseAIFunctionEnvelope<Response: Decodable>: Decodable {
+    let data: Response?
+    let error: String?
+}
+
+private struct SupabaseAIFunctionErrorEnvelope: Decodable {
+    let error: String
+}

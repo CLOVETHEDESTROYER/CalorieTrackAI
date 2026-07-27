@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Glass Tint Colors
 
-enum GlassTint {
+enum GlassTint: Equatable {
     case blue
     case green
     case orange
@@ -13,13 +13,20 @@ enum GlassTint {
     
     var color: Color {
         switch self {
-        case .blue: return .blue
-        case .green: return .green
-        case .orange: return .orange
-        case .yellow: return .yellow
-        case .purple: return .purple
+        case .blue: return MFTTheme.accent
+        case .green: return MFTTheme.accent
+        case .orange, .yellow: return MFTTheme.amber
+        case .purple: return .white
         case .red: return .red
-        case .neutral: return .gray
+        case .neutral: return .secondary
+        }
+    }
+
+    var foregroundColor: Color {
+        switch self {
+        case .blue, .green, .orange, .yellow, .purple: return MFTTheme.performance
+        case .red: return .white
+        case .neutral: return .primary
         }
     }
 }
@@ -59,26 +66,11 @@ struct GlassCard: View {
     
     var body: some View {
         ZStack {
-            // Base glass layer with blur
             Rectangle()
-                .fill(.ultraThinMaterial)
-                .opacity(intensity.opacity)
-            
-            // Tint overlay
+                .fill(MFTTheme.surface.opacity(intensity.opacity))
+
             Rectangle()
-                .fill(tint.color.opacity(0.08))
-                .blendMode(.overlay)
-            
-            // Subtle shimmer effect
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.1),
-                    Color.clear,
-                    Color.white.opacity(0.05)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+                .fill(tint.color.opacity(tint == .neutral ? 0.025 : 0.055))
         }
     }
 }
@@ -95,26 +87,11 @@ struct GlassBackground: View {
     
     var body: some View {
         ZStack {
-            // Prominent glass material
             Rectangle()
-                .fill(.regularMaterial)
-            
-            // Color tint
+                .fill(MFTTheme.surface)
+
             Rectangle()
-                .fill(tint.color.opacity(0.12))
-                .blendMode(.overlay)
-            
-            // Enhanced shimmer for prominent surfaces
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.15),
-                    Color.clear,
-                    tint.color.opacity(0.1),
-                    Color.clear
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+                .fill(tint.color.opacity(tint == .neutral ? 0.03 : 0.075))
         }
     }
 }
@@ -171,16 +148,21 @@ struct GlassCardModifier: ViewModifier {
     let cornerRadius: CGFloat
     
     func body(content: Content) -> some View {
+        let radius = min(cornerRadius, 8)
+
         content
             .background {
                 if #available(iOS 18.0, *) {
                     GlassCard(tint: tint, intensity: .subtle)
-                        .cornerRadius(cornerRadius)
+                        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
                 } else {
-                    // iOS 17 fallback
-                    tint.color.opacity(0.1)
-                        .cornerRadius(cornerRadius)
+                    MFTTheme.surface
+                        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
                 }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(tint == .neutral ? MFTTheme.divider : tint.color.opacity(0.24), lineWidth: 1)
             }
     }
 }
@@ -192,15 +174,16 @@ struct GlassBackgroundModifier: ViewModifier {
     let cornerRadius: CGFloat
     
     func body(content: Content) -> some View {
+        let radius = min(cornerRadius, 8)
+
         content
             .background {
                 if #available(iOS 18.0, *) {
                     GlassBackground(tint: tint)
-                        .cornerRadius(cornerRadius)
+                        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
                 } else {
-                    // iOS 17 fallback
-                    tint.color.opacity(0.15)
-                        .cornerRadius(cornerRadius)
+                    MFTTheme.surface
+                        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
                 }
             }
     }
@@ -215,15 +198,16 @@ struct ConditionalGlassModifier: ViewModifier {
     let fallbackColor: Color?
     
     func body(content: Content) -> some View {
+        let radius = min(cornerRadius, 8)
+
         content
             .background {
                 if #available(iOS 18.0, *) {
                     GlassCard(tint: tint, intensity: intensity)
-                        .cornerRadius(cornerRadius)
+                        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
                 } else {
-                    // iOS 17 fallback - use provided color or default
-                    (fallbackColor ?? tint.color.opacity(0.1))
-                        .cornerRadius(cornerRadius)
+                    (fallbackColor ?? MFTTheme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
                 }
             }
     }
@@ -265,24 +249,8 @@ extension View {
     /// Adds a subtle glass border effect
     func glassBorder(tint: GlassTint = .neutral, cornerRadius: CGFloat = 12) -> some View {
         self.overlay {
-            if #available(iOS 18.0, *) {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                tint.color.opacity(0.3),
-                                tint.color.opacity(0.1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            } else {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(tint.color.opacity(0.3), lineWidth: 1)
-            }
+            RoundedRectangle(cornerRadius: min(cornerRadius, 8), style: .continuous)
+                .strokeBorder(tint.color.opacity(tint == .neutral ? 0.12 : 0.28), lineWidth: 1)
         }
     }
 }
-

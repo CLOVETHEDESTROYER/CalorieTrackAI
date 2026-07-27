@@ -1,6 +1,6 @@
-# Supabase Setup Guide for CalTrack AI
+# Supabase Setup Guide for My Fatness Tracker
 
-This guide will help you integrate Supabase backend with your CalTrack AI Swift app.
+This guide will help you integrate the Supabase backend with the My Fatness Tracker Swift app.
 
 ## 🚀 Quick Start
 
@@ -9,7 +9,7 @@ This guide will help you integrate Supabase backend with your CalTrack AI Swift 
 1. Go to [supabase.com](https://supabase.com) and create an account
 2. Click "New Project"
 3. Choose your organization and enter:
-   - **Name**: CalTrack AI
+   - **Name**: My Fatness Tracker
    - **Database Password**: (choose a strong password)
    - **Region**: Choose closest to your users
 4. Wait for project creation (2-3 minutes)
@@ -19,14 +19,20 @@ This guide will help you integrate Supabase backend with your CalTrack AI Swift 
 1. In your Supabase dashboard, go to **Settings** → **API**
 2. Copy these values:
    - **Project URL**: `https://your-project.supabase.co`
-   - **Anon Public Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+   - **Anon Public Key** or **Publishable Key**
+
+Do not use the database password, JWT secret, personal access token, or service role key in the iOS app.
 
 ### 3. Set Up Database
 
 1. Go to **SQL Editor** in your Supabase dashboard
-2. Copy the entire contents of `supabase_setup.sql`
+2. Copy the entire contents of `supabase_fresh_start.sql`
 3. Paste and run the SQL query
 4. Verify tables were created in **Table Editor**
+
+The older two-file setup still exists for reference, but new projects should use `supabase_fresh_start.sql`.
+
+The bootstrap enables RLS, grants the signed-in `authenticated` role access to the app tables through Supabase's generated Data API, and keeps `anon` blocked from user-owned data. Coach meal reminders default to enabled so fresh accounts match the app's tough-love breakfast/lunch/dinner accountability behavior.
 
 ### 4. Add Supabase to Xcode
 
@@ -37,30 +43,57 @@ This guide will help you integrate Supabase backend with your CalTrack AI Swift 
 
 ### 5. Configure Your App
 
-1. Open `Services/SupabaseService.swift`
-2. Replace the placeholder values:
+Do not hardcode keys in Swift. From the folder that contains `CalorieTrackAI.xcodeproj`, create `Config.xcconfig` from the template:
 
-```swift
-private init() {
-    // Replace with your actual Supabase URL and anon key
-    let supabaseURL = URL(string: "https://your-project.supabase.co")!
-    let supabaseKey = "your-anon-key-here"
-
-    self.client = SupabaseClient(
-        supabaseURL: supabaseURL,
-        supabaseKey: supabaseKey
-    )
-    // ... rest of init
-}
+```bash
+cp CalorieTrackAI/Config.xcconfig.template Config.xcconfig
 ```
+
+Then set:
+
+```xcconfig
+SUPABASE_URL = https:/$()/your-project-id.supabase.co
+SUPABASE_PUBLISHABLE_KEY = your-supabase-publishable-key-here
+SUPABASE_ANON_KEY = your-supabase-anon-key-here
+```
+
+Use `SUPABASE_PUBLISHABLE_KEY` if your dashboard shows a key that starts with `sb_publishable_`. If your dashboard only shows legacy keys, put the anon public key in `SUPABASE_ANON_KEY`. Keep `OPENAI_API_KEY` in Supabase Edge Function secrets for `mft-ai-coach`, never in the iOS app. Never put the service role key in the iOS app. In `.xcconfig`, write Supabase URLs as `https:/$()/your-project-id.supabase.co` so Xcode does not treat `//` as a comment.
+
+### 6. Configure Auth Redirects
+
+In Supabase Dashboard, go to **Authentication** → **URL Configuration** and add this redirect URL:
+
+```text
+myfatnesstracker://auth-callback
+```
+
+The iOS app registers the `myfatnesstracker` URL scheme and uses that callback for password reset links.
+
+If Apple Developer asks for web callback values while setting up a Services ID, use:
+
+```text
+Domain: tlbdjexawwfpeuykumbv.supabase.co
+Callback URL: https://tlbdjexawwfpeuykumbv.supabase.co/auth/v1/callback
+```
+
+### 7. Configure Sign in with Apple
+
+The iOS app uses native Sign in with Apple and passes Apple's identity token to Supabase.
+
+1. In Apple Developer, enable **Sign in with Apple** for the app identifier `com.hyperlabsAI.CalorieTrackAI`.
+2. Regenerate or refresh the provisioning profile Xcode uses for archive so it includes the Apple sign-in entitlement.
+3. In Supabase Dashboard, go to **Authentication** → **Providers** → **Apple** for project `tlbdjexawwfpeuykumbv` and enable the provider.
+4. Add `com.hyperlabsAI.CalorieTrackAI` to the Apple provider **Client IDs** list. Native iOS-only sign-in uses the app bundle ID and does not require storing an Apple OAuth secret in the iOS app.
+5. Test on a real device signed into iCloud. Apple only returns the user's full name on the first authorization, so the app stores that initial name in the profile table when available.
 
 ## 🔧 Features Included
 
 ### ✅ Authentication
 
 - Email/password signup and login
+- Native Sign in with Apple through Supabase Auth
 - Automatic session management
-- Password reset functionality
+- Password reset emails with an in-app new-password sheet
 - Row Level Security (RLS) for data protection
 
 ### ✅ Data Models
@@ -68,7 +101,11 @@ private init() {
 - **MealEntry**: Enhanced food logging with meal types
 - **UserProfile**: Complete user profile management
 - **FoodItem**: Comprehensive food database
-- **NutritionSummary**: Analytics and reporting
+- **CoachUserSettingsRecord**: Coach tone and notification settings
+- **FitnessPlanRecord**: Generated meal/workout plans
+- **ActivityDailySummaryRecord**: HealthKit-derived daily rollups
+- **GymLocationRecord/GymVisitRecord**: Saved gyms and geofence visits
+- **PeptideLogRecord**: User-entered peptide logbook calculations
 
 ### ✅ Real-time Features
 
@@ -136,6 +173,7 @@ let food = try await BarcodeService.shared.lookupFood(barcode: "1234567890")
 - Users can only access their own data
 - Automatic user ID filtering
 - Secure API access
+- Explicit Data API grants for signed-in users, with anonymous access revoked for user-owned tables
 
 ### Data Validation
 
@@ -159,6 +197,12 @@ The app includes comprehensive offline support:
 - `food_database` - Global food information
 - `user_profiles` - User profile data
 - `meal_entries` - User's food logs
+- `coach_user_settings` - Coach tone and notification preferences
+- `fitness_plans` - Generated meal and workout plans
+- `activity_daily_summaries` - HealthKit-derived daily activity summaries
+- `gym_locations` - User-saved gym geofences
+- `gym_visits` - Manual and geofence gym check-ins
+- `peptide_logs` - User-entered peptide calculator logs
 
 ### Key Features:
 
@@ -212,9 +256,9 @@ SupabaseService.shared.subscribeToMealEntries { entries in
 
 After setup, you can enhance the app with:
 
-1. **Push Notifications**: Meal reminders
+1. **Remote Push Notifications**: Server-triggered reminders beyond current local notifications
 2. **Image Recognition**: Food photo analysis
-3. **HealthKit Integration**: Sync with Apple Health
+3. **Apple Watch App**: Faster coach and logging surfaces
 4. **Social Features**: Share progress with friends
 5. **Analytics**: Advanced nutrition insights
 
@@ -234,4 +278,4 @@ After setup, you can enhance the app with:
 
 ---
 
-🎉 **Congratulations!** Your CalTrack AI app now has a powerful Supabase backend with user authentication, real-time data sync, and comprehensive nutrition tracking capabilities.
+Your app now has the Supabase backend tables needed for authentication, nutrition tracking, coaching, plans, activity rollups, gym check-ins, and peptide logbook sync.

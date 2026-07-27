@@ -12,14 +12,15 @@ struct AIFoodAnalysisView: View {
     @State private var selectedTab = 0
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack {
                 Picker("AI Features", selection: $selectedTab) {
                     Text("Analyze Meal").tag(0)
                     Text("Meal Suggestions").tag(1)
                 }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding()
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
                 
                 if selectedTab == 0 {
                     mealAnalysisView
@@ -27,7 +28,10 @@ struct AIFoodAnalysisView: View {
                     mealSuggestionsView
                 }
             }
-            .navigationTitle("AI Nutrition Assistant")
+            .background(MFTTheme.background.ignoresSafeArea())
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .mftPageChrome()
             .alert("Error", isPresented: $showingError) {
                 Button("OK") { }
             } message: {
@@ -41,19 +45,30 @@ struct AIFoodAnalysisView: View {
     private var mealAnalysisView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // Input Section
+                MFTPageHeader(
+                    kicker: "AI nutrition",
+                    title: "Name the damage.",
+                    subtitle: "Describe the meal. We will estimate its calories and macros before it becomes a mystery."
+                )
+
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Describe Your Meal")
-                        .font(.headline)
-                        .fontWeight(.semibold)
+                    Text("DESCRIBE YOUR MEAL")
+                        .font(.caption.monospaced())
+                        .fontWeight(.black)
+                        .foregroundColor(MFTTheme.accent)
                     
                     Text("Tell me what you ate in natural language")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
                     TextField("e.g., Two slices of whole wheat toast with avocado and scrambled eggs", text: $mealDescription, axis: .vertical)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
                         .lineLimit(3...6)
+                        .padding(14)
+                        .background(MFTTheme.elevatedSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(MFTTheme.divider, lineWidth: 1)
+                        }
                     
                     Button(action: analyzeMeal) {
                         HStack {
@@ -67,26 +82,25 @@ struct AIFoodAnalysisView: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(mealDescription.isEmpty ? Color.gray : Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .foregroundColor(mealDescription.isEmpty ? MFTTheme.mutedText : MFTTheme.performance)
+                        .background(
+                            mealDescription.isEmpty ? MFTTheme.elevatedSurface : MFTTheme.accent,
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        )
                     }
                     .disabled(mealDescription.isEmpty || openAIService.isLoading)
                 }
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(12)
+                .padding(16)
+                .mftPanel(accent: MFTTheme.accent)
                 
-                // Results Section
                 if let analysis = analysisResult {
                     analysisResultView(analysis)
                 }
                 
-                // Example prompts
                 examplePromptsView
             }
-            .padding()
+            .padding(16)
         }
     }
     
@@ -100,27 +114,24 @@ struct AIFoodAnalysisView: View {
     
     private func analysisResultView(_ analysis: MealAnalysis) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("AI Analysis Results")
-                .font(.headline)
-                .fontWeight(.semibold)
+            Text("ESTIMATED DAMAGE")
+                .font(.caption.monospaced())
+                .fontWeight(.black)
+                .foregroundColor(MFTTheme.accent)
             
-            // Nutrition Summary
             VStack(spacing: 12) {
-                nutritionRow("Calories", value: "\(Int(analysis.totalCalories))", unit: "cal", color: .blue)
+                nutritionRow("Calories", value: "\(Int(analysis.totalCalories))", unit: "cal", color: MFTTheme.accent)
                 nutritionRow("Protein", value: "\(Int(analysis.protein))", unit: "g", color: .red)
-                nutritionRow("Carbohydrates", value: "\(Int(analysis.carbohydrates))", unit: "g", color: .orange)
-                nutritionRow("Fat", value: "\(Int(analysis.fat))", unit: "g", color: .yellow)
+                nutritionRow("Carbohydrates", value: "\(Int(analysis.carbohydrates))", unit: "g", color: MFTTheme.amber)
+                nutritionRow("Fat", value: "\(Int(analysis.fat))", unit: "g", color: MFTTheme.blue)
                 
                 if analysis.fiber > 0 {
                     nutritionRow("Fiber", value: "\(Int(analysis.fiber))", unit: "g", color: .green)
                 }
             }
-            .padding()
-            .background(Color.white)
-            .cornerRadius(10)
-            .shadow(radius: 2)
+            .padding(14)
+            .background(MFTTheme.elevatedSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             
-            // Confidence and Assumptions
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Confidence Level:")
@@ -148,11 +159,9 @@ struct AIFoodAnalysisView: View {
                     }
                 }
             }
-            .padding()
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(10)
+            .padding(14)
+            .background(MFTTheme.elevatedSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             
-            // Add to Log Button
             Button(action: {
                 addAnalysisToLog(analysis)
             }) {
@@ -161,15 +170,13 @@ struct AIFoodAnalysisView: View {
                     Text("Add to Food Log")
                 }
                 .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.green)
-                .foregroundColor(.white)
-                .cornerRadius(10)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .background(MFTTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .foregroundColor(MFTTheme.performance)
             }
         }
-        .padding()
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(12)
+        .padding(16)
+        .mftPanel(accent: MFTTheme.accent)
     }
     
     private func nutritionRow(_ label: String, value: String, unit: String, color: Color) -> some View {
@@ -196,9 +203,10 @@ struct AIFoodAnalysisView: View {
     
     private var examplePromptsView: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Example Descriptions")
-                .font(.headline)
-                .fontWeight(.semibold)
+            Text("QUICK STARTS")
+                .font(.caption.monospaced())
+                .fontWeight(.black)
+                .foregroundColor(MFTTheme.accent)
             
             Text("Try these examples to see how AI analysis works:")
                 .font(.caption)
@@ -211,18 +219,17 @@ struct AIFoodAnalysisView: View {
                     }) {
                         Text(example)
                             .font(.caption)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.gray.opacity(0.2))
-                            .foregroundColor(.primary)
-                            .cornerRadius(15)
+                            .foregroundColor(.white.opacity(0.88))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(MFTTheme.elevatedSurface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
-        .padding()
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(12)
+        .padding(16)
+        .mftPanel()
     }
     
     // MARK: - Helper Methods
@@ -329,20 +336,20 @@ struct MealSuggestionsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // Header with preferences
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("AI Meal Suggestions")
-                            .font(.headline)
-                            .fontWeight(.semibold)
+                        Text("MEAL PLAN")
+                            .font(.caption.monospaced())
+                            .fontWeight(.black)
+                            .foregroundColor(MFTTheme.accent)
                         
                         Spacer()
                         
                         Button("Preferences") {
                             showingPreferences = true
                         }
-                        .font(.caption)
-                        .foregroundColor(.blue)
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(MFTTheme.accent)
                     }
                     
                     Text("Get personalized meal suggestions based on your goals")
@@ -361,23 +368,20 @@ struct MealSuggestionsView: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .foregroundColor(MFTTheme.performance)
+                        .background(MFTTheme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
                     .disabled(openAIService.isLoading || userService.currentUserProfile == nil)
                 }
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(12)
+                .padding(16)
+                .mftPanel(accent: MFTTheme.accent)
                 
-                // Meal Plan Results
                 if let plan = mealPlan {
                     mealPlanView(plan)
                 }
             }
-            .padding()
+            .padding(16)
         }
         .sheet(isPresented: $showingPreferences) {
             MealPreferencesView(preferences: $preferences)
@@ -391,9 +395,10 @@ struct MealSuggestionsView: View {
     
     private func mealPlanView(_ plan: DailyMealPlan) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Your Daily Meal Plan")
-                .font(.headline)
-                .fontWeight(.semibold)
+            Text("TODAY'S PLAN")
+                .font(.caption.monospaced())
+                .fontWeight(.black)
+                .foregroundColor(MFTTheme.accent)
             
             mealCardView("Breakfast", meal: plan.breakfast, icon: "sunrise.fill", color: .orange)
             mealCardView("Lunch", meal: plan.lunch, icon: "sun.max.fill", color: .yellow)
@@ -424,8 +429,7 @@ struct MealSuggestionsView: View {
                     .fontWeight(.bold)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(color.opacity(0.2))
-                    .cornerRadius(8)
+                    .background(color.opacity(0.2), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
             
             Text(meal.name)
@@ -443,10 +447,8 @@ struct MealSuggestionsView: View {
                 macroChip("F", value: Int(meal.fat), unit: "g", color: .yellow)
             }
         }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(12)
-        .shadow(radius: 2)
+        .padding(16)
+        .mftPanel(accent: color)
     }
     
     private func macroChip(_ label: String, value: Int, unit: String, color: Color) -> some View {
@@ -460,10 +462,9 @@ struct MealSuggestionsView: View {
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(color.opacity(0.1))
-        .cornerRadius(4)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(color.opacity(0.14), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
     
     private func generateMealPlan() {
@@ -598,4 +599,4 @@ struct MealPreferencesView: View {
 
 #Preview {
     AIFoodAnalysisView()
-} 
+}

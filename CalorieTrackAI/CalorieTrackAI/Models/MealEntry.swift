@@ -59,7 +59,9 @@ struct MealEntry: Identifiable, Codable {
         consumed_at: Date = Date(),
         notes: String? = nil,
         food_id: UUID? = nil,
-        image_url: String? = nil
+        image_url: String? = nil,
+        createdAt: Date? = nil,
+        updatedAt: Date? = nil
     ) {
         self.id = id
         self.user_id = user_id
@@ -72,8 +74,8 @@ struct MealEntry: Identifiable, Codable {
         self.serving_quantity = serving_quantity
         self.meal_type = meal_type
         self.consumed_at = consumed_at
-        self.created_at = Date()
-        self.updated_at = Date()
+        self.created_at = createdAt ?? Date()
+        self.updated_at = updatedAt ?? Date()
         self.notes = notes
         self.food_id = food_id
         self.image_url = image_url
@@ -97,7 +99,8 @@ struct MealEntry: Identifiable, Codable {
     }
     
     // Convert from legacy Food model
-    static func from(food: Food, mealType: MealType = .snack) -> MealEntry {
+    static func from(food: Food, mealType: MealType? = nil) -> MealEntry {
+        let resolvedMealType = mealType ?? food.mealType ?? MealTimeClassifier.mealType(for: food.dateLogged)
         return MealEntry(
             food_name: food.name,
             calories: food.calories,
@@ -105,7 +108,7 @@ struct MealEntry: Identifiable, Codable {
             carbohydrates: food.carbs,
             fat: food.fat,
             serving_size: food.servingSize,
-            meal_type: mealType,
+            meal_type: resolvedMealType,
             consumed_at: food.dateLogged
         )
     }
@@ -118,7 +121,9 @@ struct MealEntry: Identifiable, Codable {
             protein: totalProtein,
             carbs: totalCarbohydrates,
             fat: totalFat,
-            servingSize: serving_size
+            servingSize: serving_size,
+            dateLogged: consumed_at,
+            mealType: meal_type
         )
     }
 }
@@ -310,4 +315,4 @@ struct NutritionSummary: Codable {
     var averageFat: Double {
         return totalFat / Double(period)
     }
-} 
+}

@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>CalTrack AI</string>
+    <string>My Fatness Tracker</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -13,15 +13,17 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
+    <string>My Fatness</string>
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key>
@@ -36,10 +38,6 @@
         <key>UIImageName</key>
         <string>AppIcon</string>
     </dict>
-    <key>UIRequiredDeviceCapabilities</key>
-    <array>
-        <string>armv7</string>
-    </array>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
@@ -53,33 +51,63 @@
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
-    
+
     <!-- Permissions for app features -->
     <key>NSCameraUsageDescription</key>
-    <string>CalTrack AI needs camera access to scan food barcodes and take photos of meals for nutrition analysis.</string>
+    <string>My Fatness Tracker uses the camera to scan food barcodes, analyze meal photos for nutrition logging, and check push-up form for movement challenge points.</string>
+    <key>NSHealthShareUsageDescription</key>
+    <string>My Fatness Tracker reads steps, workouts, active energy, and exercise minutes from Health to show activity progress.</string>
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>My Fatness Tracker may save activity-related updates to Health only when you allow it, so your workout and activity history stays consistent.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>My Fatness Tracker uses saved gym locations to detect optional gym check-ins for your activity history.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>My Fatness Tracker uses saved gym locations to detect optional gym check-ins for your activity history.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>My Fatness Tracker uses your location to search nearby gyms and support gym check-ins.</string>
+    <key>NSLocationTemporaryUsageDescriptionDictionary</key>
+    <dict>
+        <key>GymArrivalPrecision</key>
+        <string>My Fatness Tracker uses precise location briefly to verify you reached the saved gym entrance before awarding an automatic check-in.</string>
+    </dict>
     <key>NSMicrophoneUsageDescription</key>
-    <string>CalTrack AI needs microphone access for voice input when logging foods.</string>
+    <string>My Fatness Tracker needs microphone access for voice input when logging foods.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>CalTrack AI uses speech recognition to convert your voice input into food entries.</string>
+    <string>My Fatness Tracker uses speech recognition to convert your voice input into food entries.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>CalTrack AI needs photo library access to analyze food photos for nutrition information.</string>
+    <string>My Fatness Tracker needs photo library access to analyze food photos for nutrition information.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>CalTrack AI needs permission to save food photos to your library.</string>
-    
+    <string>My Fatness Tracker needs permission to save food photos to your library.</string>
+
     <!-- App Transport Security -->
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>
         <false/>
     </dict>
-    
+
+    <!-- Supabase Auth deep link for email confirmation and password recovery -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.hyperlabsAI.CalorieTrackAI.auth</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>myfatnesstracker</string>
+            </array>
+        </dict>
+    </array>
+
     <!-- API Configuration - Values loaded from Config.xcconfig -->
     <!-- To set up: Copy Config.xcconfig.template to Config.xcconfig and add your keys -->
-    <key>OPENAI_API_KEY</key>
-    <string>$(OPENAI_API_KEY)</string>
     <key>SUPABASE_URL</key>
     <string>$(SUPABASE_URL)</string>
+    <key>SUPABASE_PUBLISHABLE_KEY</key>
+    <string>$(SUPABASE_PUBLISHABLE_KEY)</string>
     <key>SUPABASE_ANON_KEY</key>
     <string>$(SUPABASE_ANON_KEY)</string>
+    <key>MFT_UNLOCK_FEATURES_FOR_TESTING</key>
+    <true/>
 </dict>
-</plist> 
+</plist>

@@ -209,8 +209,9 @@ class UserService: ObservableObject {
             let leanMass = weightKg * (1 - bodyFat / 100)
             bmr = 370 + (21.6 * leanMass)
         } else if weightKg > 0 && heightCm > 0 {
-            // Harris-Benedict (Mifflin-St Jeor for males)
-            bmr = 88.362 + (13.397 * weightKg) + (4.799 * heightCm) - (5.677 * Double(age))
+            // Mifflin-St Jeor uses profile sex when body composition is unavailable.
+            let sexAdjustment = user.gender == .male ? 5.0 : -161.0
+            bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * Double(age)) + sexAdjustment
         } else {
             bmr = 1800 // fallback
         }
@@ -273,4 +274,4 @@ enum UserServiceError: LocalizedError {
             return "Failed to sync user data"
         }
     }
-} 
+}

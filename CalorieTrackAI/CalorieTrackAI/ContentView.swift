@@ -4,55 +4,82 @@ struct ContentView: View {
     @EnvironmentObject var supabaseService: SupabaseService
     @Environment(\.showAuth) private var showAuth
 
+    @State private var selectedTab: AppTab = .train
+
     var body: some View {
-        TabView {
-            DashboardView()
+        TabView(selection: $selectedTab) {
+            ChallengeHomeView()
                 .tabItem {
-                    Label("Dashboard", systemImage: "house.fill")
+                    Label("Train", systemImage: "figure.strengthtraining.traditional")
                 }
+                .tag(AppTab.train)
             LogFoodView()
                 .tabItem {
-                    Label("Log Food", systemImage: "plus.circle.fill")
+                    Label("Food", systemImage: "fork.knife")
                 }
-            HistoryView()
+                .tag(AppTab.food)
+            ActivityCoachView()
                 .tabItem {
-                    Label("History", systemImage: "clock.fill")
+                    Label("Activity", systemImage: "figure.walk")
                 }
+                .tag(AppTab.activity)
             ProfileView()
                 .tabItem {
-                    Label("Profile", systemImage: "person.crop.circle")
+                    Label("Settings", systemImage: "gearshape.fill")
                 }
+                .tag(AppTab.settings)
         }
-        .overlay(alignment: .top) {
+        .tint(MFTTheme.accent)
+        .toolbarBackground(MFTTheme.performance, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarColorScheme(.dark, for: .tabBar)
+        .background(MFTTheme.background.ignoresSafeArea())
+        .safeAreaInset(edge: .top, spacing: 0) {
             if supabaseService.isGuestMode {
-                VStack(spacing: 0) {
-                    HStack {
-                        Text("Sign up for free to save your data and sync across devices!")
-                            .font(.caption)
-                            .foregroundColor(.white)
-                        Spacer()
-                        GlassButton(
-                            "Sign Up / Log In",
-                            tint: .blue,
-                            style: .compact
-                        ) {
-                            showAuth.wrappedValue = true
-                        }
+                let testingStatus = AppFeatureFlags.testingModeStatus(isGuestMode: true)
+                HStack(spacing: 10) {
+                    Label(
+                        testingStatus.isUnlocked ? "Preview mode" : "Guest mode",
+                        systemImage: testingStatus.isUnlocked ? "testtube.2" : "person.crop.circle"
+                    )
+                    .font(.caption)
+                    .fontWeight(.semibold)
+
+                    Spacer()
+
+                    Button {
+                        showAuth.wrappedValue = true
+                    } label: {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.body)
+                            .frame(width: 32, height: 32)
+                            .background(MFTTheme.accent, in: Circle())
+                            .foregroundColor(.black)
                     }
-                    .padding(8)
-                    .background {
-                        if #available(iOS 18.0, *) {
-                            GlassBackground(tint: .blue)
-                        } else {
-                            Color.blue.opacity(0.95)
-                        }
-                    }
+                    .accessibilityLabel("Sign up or log in")
                 }
-                .transition(.move(edge: .top))
-                .zIndex(2)
+                .padding(.leading, 14)
+                .padding(.trailing, 8)
+                .frame(height: 44)
+                .background(.thinMaterial)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(MFTTheme.divider)
+                        .frame(height: 1)
+                }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openSocialCompetition)) { _ in
+            selectedTab = .train
+        }
     }
+}
+
+private enum AppTab: Hashable {
+    case train
+    case food
+    case activity
+    case settings
 }
 
 private struct ShowAuthKey: EnvironmentKey {
@@ -67,4 +94,4 @@ extension EnvironmentValues {
 
 #Preview {
     ContentView()
-} 
+}

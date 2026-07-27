@@ -9,14 +9,25 @@ struct Food: Identifiable, Codable {
     var fat: Double
     var servingSize: String
     var dateLogged: Date
+    var mealType: MealEntry.MealType?
     
-    init(name: String, calories: Double, protein: Double = 0, carbs: Double = 0, fat: Double = 0, servingSize: String = "1 serving") {
+    init(
+        name: String,
+        calories: Double,
+        protein: Double = 0,
+        carbs: Double = 0,
+        fat: Double = 0,
+        servingSize: String = "1 serving",
+        dateLogged: Date = Date(),
+        mealType: MealEntry.MealType? = nil
+    ) {
         self.name = name
         self.calories = calories
         self.protein = protein
         self.carbs = carbs
         self.fat = fat
         self.servingSize = servingSize
-        self.dateLogged = Date()
+        self.dateLogged = dateLogged
+        self.mealType = mealType
     }
-} 
+}
