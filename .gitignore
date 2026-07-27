@@ -15,6 +15,7 @@ Config.xcconfig
 !Config.xcconfig.template
 
 # Local Supabase exports/backups
+supabase/config.toml
 *.backup
 *.backup.gz
 *.storage.zip
